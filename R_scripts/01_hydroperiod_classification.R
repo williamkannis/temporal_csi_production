@@ -12,8 +12,7 @@
 # data folder and uses these data to classify sampling events (site+years) into
 # 3 classifications based on annual inundated days. Data are available at period
 # level for plots and throws, and these need to be aggregated to the year and
-# site level. Data from this script is exported for use in exploration and
-# analysis scripts.
+# site level. 
 
 
 # Housekeeping  ----------------------------------------------------------------
@@ -23,8 +22,12 @@ rm(list = ls())
 library(dplyr)
 
 # Directories
-data_dir <- "~/Documents/Work/Everglades post-doc/Data analysis/Data cleaning/cleaned_data"
+data_dir <- paste0(
+  "~/Documents/Work/Everglades post-doc/",
+  "Data analysis/Data cleaning/cleaned_data"
+)
 input_dir <- "input_data"
+
 
 # Data
 phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-02-25.rds"))
@@ -53,7 +56,12 @@ hyd_df <- phy_df %>%
     hydroperiod = factor(hydroperiod,levels=c("short","intermediate","long"))) 
 
 # Are the number of site/year/periods the same
-phy_df %>% distinct(cum,region,site) %>% nrow() == hyd_df %>% distinct(cum,region,site) %>% nrow()
+phy_df %>% 
+  distinct(cum,region,site) %>% 
+  nrow() == 
+  hyd_df %>% 
+  distinct(cum,region,site) %>% 
+  nrow()
 
 # Export data  -----------------------------------------------------------------
 
@@ -64,9 +72,7 @@ summary(hyd_df)
 # Export
 saveRDS(
   hyd_df,
-  file.path(
-    input_dir,
-    paste0("hydr_class_annual_",Sys.Date(),".rds")
+  file.path(input_dir,paste0("hydr_class_annual_",Sys.Date(),".rds")
     )
   )
 
