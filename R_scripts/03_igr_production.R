@@ -38,8 +38,8 @@ stack_list <- readRDS(file.path(stack_dir,"stack_wt_out_2026-06-22.rds"))
 
 # Data preparation  ------------------------------------------------------------
 
-# Create data.frame containing sampling event, date, and sampling area (i.e.,
-# number of traps)
+# Create data.frame containing sampling event, date, sampling area (i.e.,
+# number of traps), and interval between sampling periods
 samp_df <- len_df %>% 
   left_join(hyd_df) %>% 
   mutate(group_id = as.numeric(hydroperiod)) %>% 
@@ -47,27 +47,47 @@ samp_df <- len_df %>%
   summarise(
     date = mean(date,na.rm=T),
     area = n_distinct(plot,throw)
-    ) 
+    ) %>% 
+  sample_interval() %>% 
+  filter(
+    #!is.na(interval),
+    interval >0) 
 
-# Estiamte number of days between each sampling event
-interval_df <- sample_interval(samp_df) %>% 
-  filter(!is.na(interval)) %>% 
-  left_join(samp_df)
+## ISSUES WITH INTERVALS 124 -125 sites 07 and 08
+### REQUIRE USERS TO HAVE CONSEQUATIVE SAMPLE COUNTER, MAKE A FUNCTION
+# TO GENREATE THIS 
+
+# Estimate number of days between each sampling event
+# interval_df <- samp_df %>%
+#   filter(
+#     !is.na(interval),
+#     interval >0
+#     ) 
 
 
 # Estimate biomass for each fish and attach sampling info
 bio_df <- len_df %>% 
-  left_join(hyd_df) %>% 
-  left_join(samp_df %>% select(-date)) %>% 
+  # left_join(hyd_df) %>% 
+  # left_join(samp_df %>% select(-date)) %>% 
   left_join(wt_df) %>% 
-  left_join(interval_df) %>% 
+  # left_join(interval_df) %>% 
   mutate(
     wet_wt = 10^(a + b * log10(length*c)),
-    dry_wt = wet_wt*.19
+    wt = wet_wt*.19
     ) %>% 
-  select(region,site,wateryear,cum,interval,group_id,area, species,length,dry_wt)
+  select(
+    region,
+    site,
+    wateryear,
+    cum,
+    # interval,
+    # group_id,
+    # area, 
+    species,
+    length,
+    wt
+    )
   
-
 
 # Species-specific production estimates  ---------------------------------------
 sp <- names(stack_list)[[4]]
@@ -88,15 +108,15 @@ growth_list <- lapply(sp, function(sp){
   growth_post <- stack_predict(
     stack.df = stack,
     mod.dir = sp_dir,
-    sim = 100,
+    sim = 10,
     summarize = F,
     sum.fun = "median",
     type = "prediction",
     group.id = "cat",
     pred.input = length_vec,
     create.input = T,
-    pred.group = interval_df$group_id,
-    pred.interval = interval_df$interval,
+    pred.group = samp_df$group_id,
+    pred.interval = samp_df$interval,
     stack = T,
     input.var = "length",
     output.var = c("interval_growth","age"),
