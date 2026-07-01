@@ -23,10 +23,6 @@ devtools::load_all("~/Documents/work/R packages/secProd")
 
 # Production directories
 input_dir <- "input_data"
-data_dir <- file.path(
-  "~/Documents/Work/Everglades post-doc/Data analysis/Data cleaning",
-  "cleaned_data"
-)
 
 # Growth model directories
 grow_dir <- "~/Documents/Work/Everglades post-doc/Data analysis/growth curves"
@@ -34,7 +30,7 @@ stack_dir <- file.path(grow_dir,"loo_outputs_cat")
 mod_dir <- file.path(grow_dir,"stan_outputs/model_out")
 
 # Data
-len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-06-30.rds"))
+len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-01.rds"))
 hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-06-25.rds"))
 wt_df <- read.csv(file.path(input_dir,"length_weight_parameters.csv"))
 stack_list <- readRDS(file.path(stack_dir,"stack_wt_out_2026-06-22.rds"))
