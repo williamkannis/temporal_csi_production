@@ -30,8 +30,8 @@ stack_dir <- file.path(grow_dir,"loo_outputs_cat")
 mod_dir <- file.path(grow_dir,"stan_outputs/model_out")
 
 # Data
-len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-01.rds"))
-hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-06-25.rds"))
+len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
+hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-07-09.rds"))
 wt_df <- read.csv(file.path(input_dir,"length_weight_parameters.csv"))
 stack_list <- readRDS(file.path(stack_dir,"stack_wt_out_2026-06-22.rds"))
 
@@ -46,31 +46,34 @@ samp_df <- len_df %>%
   group_by(site,cum,group_id) %>% 
   summarise(
     date = mean(date,na.rm=T),
-    area = n_distinct(plot,throw)
+    area = n_distinct(plot,throw),
+    .groups = "drop"
     ) %>% 
-  sample_interval() %>% 
-  filter(
-    #!is.na(interval),
-    interval >0) 
+  sample_interval()
 
-## ISSUES WITH INTERVALS 124 -125 sites 07 and 08
+# Check if any missing interval has sequential sampling event
+samp_df %>% 
+  filter(is.na(interval)) %>% 
+  distinct(cum,site) %>% 
+  mutate(cum = cum+1) %>% 
+  inner_join(samp_df)
+# No issues
+
+
 ### REQUIRE USERS TO HAVE CONSEQUATIVE SAMPLE COUNTER, MAKE A FUNCTION
-# TO GENREATE THIS 
+# TO GENREATE THIS . MAYBE USE DATES AND USE SAMPLE INTERVAL FUNCTION TO DENOTE
+# MISSING INTERVALS IF DESIRED
 
 # Estimate number of days between each sampling event
-# interval_df <- samp_df %>%
-#   filter(
-#     !is.na(interval),
-#     interval >0
-#     ) 
+interval_df <- samp_df %>%
+  filter(!is.na(interval)) %>% 
+  distinct(group_id,interval)
+
 
 
 # Estimate biomass for each fish and attach sampling info
 bio_df <- len_df %>% 
-  # left_join(hyd_df) %>% 
-  # left_join(samp_df %>% select(-date)) %>% 
   left_join(wt_df) %>% 
-  # left_join(interval_df) %>% 
   mutate(
     wet_wt = 10^(a + b * log10(length*c)),
     wt = wet_wt*.19
@@ -80,9 +83,6 @@ bio_df <- len_df %>%
     site,
     wateryear,
     cum,
-    # interval,
-    # group_id,
-    # area, 
     species,
     length,
     wt
@@ -93,7 +93,7 @@ bio_df <- len_df %>%
 sp <- names(stack_list)[[4]]
 cohort <- 30
 
-growth_list <- lapply(sp, function(sp){
+prod_list <- lapply(sp, function(sp){
   
   # Filter all data for one species
   bio <- bio_df %>% filter(species == sp)
@@ -115,27 +115,36 @@ growth_list <- lapply(sp, function(sp){
     group.id = "cat",
     pred.input = length_vec,
     create.input = T,
-    pred.group = samp_df$group_id,
-    pred.interval = samp_df$interval,
+    pred.group = interval_df$group_id,
+    pred.interval = interval_df$interval,
     stack = T,
     input.var = "length",
     output.var = c("interval_growth","age"),
     wt.df = wt,
-    dry.wt = .19
+    dry.wt = .19,
+    parallel = T,
+    mc.cores = 10
   )
   
   # Species specific production
-  prod <- production_igr(
-    growth = as.data.frame(growth_post[,,1]),
+  production(
+    method = "igr",
+    sample = samp_df,
     biomass = bio,
-    size.class = cohort
-    # n.sim = 10,
-    # return.raw=F,
-    # parallel=F,
-    # mc.cores=NULL
+    growth = growth_post, 
+    class.type = "size",
+    class.size = 1,
+    bio.boot = T, 
+    growth.boot = T,
+    iter = 10,
+    return.raw = F,
+    parallel = T,
+    mc.cores = 10
   )
   
 })
+
+
 
 
 # Export  ----------------------------------------------------------------------
