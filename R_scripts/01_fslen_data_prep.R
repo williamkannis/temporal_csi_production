@@ -29,7 +29,7 @@ data_dir <- file.path(
 input_dir <- "input_data"
 
 # Data
-len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-06-30.rds"))
+len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-07-09.rds"))
 
 
 # Filter data  -----------------------------------------------------------------

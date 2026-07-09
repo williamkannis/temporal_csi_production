@@ -30,7 +30,7 @@ input_dir <- "input_data"
 
 
 # Data
-phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-02-25.rds"))
+phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
 
 
 # Create hydroperiod  ----------------------------------------------------------
