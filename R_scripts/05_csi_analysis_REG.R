@@ -31,11 +31,11 @@ plot_dir <- "figures"
 prod_df <- 
   readRDS(file.path(input_dir,"fsprod_igr_2026-07-13.rds"))
 phy_site <- 
-  readRDS(file.path(input_dir,"phys_site_predictors_2026-07-13.rds"))
+  readRDS(file.path(input_dir,"phys_site_predictors_2026-08-12.rds"))
 phy_year <- 
-  readRDS(file.path(input_dir,"phys_year_predictors_2026-07-13.rds"))
+  readRDS(file.path(input_dir,"phys_year_predictors_2026-08-12.rds"))
 phy_reg_year <- 
-  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-07-14.rds"))
+  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-08-12.rds"))
 
 # Prep data  -------------------------------------------------------------------
 
