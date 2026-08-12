@@ -156,17 +156,7 @@ phy_site_year_final <- phy_site_year %>%
 
 summary(phy_site_year_final)
 
-a <- phy_year %>% 
-  filter(is.na(pisc_index)) %>% 
-  group_by(region,site) %>% 
-  summarize(across(everything(),~mean(.x,na.rm=T)))
 
-a <- phy_year %>% 
-  group_by(region,site) %>% 
-  summarize(
-    # across(everything(),~mean(.x,na.rm=T)),
-    n = sum(!is.na(pisc_index)))
- 
 # Region-year level predictors  ------------------------------------------------
 phy_reg_year <- phy_site_year %>% 
   group_by(region,wateryear) %>% 
