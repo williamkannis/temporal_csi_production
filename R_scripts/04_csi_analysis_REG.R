@@ -44,7 +44,7 @@ phy_reg_year <-
 # Remove NA production estimates
 prod_for <- prod_df %>% filter(!is.na(production_mean))
 
-# Create a compostie production measure using all species
+# Create a composite production measure using all species
 prod_all <- prod_for %>% 
   group_by(site,cum,date,area,interval) %>% 
   summarise(
