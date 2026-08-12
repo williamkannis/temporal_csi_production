@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 #
-#   Predictor preparation
+#   Predictor preparation  ### RENAME TO SCRIPT 4
 #
 #-------------------------------------------------------------------------------
 
@@ -16,7 +16,6 @@ rm(list = ls())
 
 # Packages
 library(dplyr)
-devtools::load_all("~/Documents/work/R packages/secProd")
 
 # directores
 data_dir <- paste0(
@@ -29,22 +28,14 @@ export_dir <- "prod_data"
 # data
 len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
 pisc_df <- readRDS(file.path(data_dir,"pisc_cleaned_2026-07-13.rds"))
+samp_df <- readRDS(file.path(export_dir,"fs_sample_info_2026-08-12.rds"))
 phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
-hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-07-09.rds"))
 
 
 # Sampling interval  -----------------------------------------------------------
 
-samp_df <- len_df %>% 
-  left_join(hyd_df) %>% 
-  mutate(group_id = as.numeric(hydroperiod)) %>% 
-  group_by(region,site,wateryear,cum,group_id) %>% 
-  summarise(
-    date = mean(date,na.rm=T),
-    area = n_distinct(plot,throw),
-    .groups = "drop"
-  ) %>% 
-  sample_interval() %>% 
+## LOAD IN SAMPDF FROM PRODUCTION SCRIPT
+samp_for <- samp_df %>% 
   mutate(
     interval_pred = round(interval / 30) * 30,
     interval_pred = case_when(
@@ -78,7 +69,7 @@ phy_site <- phy_df %>%
     across(everything(),~mean(.x,na.rm=T))
   ) %>% 
   mutate(across(everything(), ~ ifelse(is.nan(.x), NA, .x))) %>% 
-  inner_join(samp_df) %>% 
+  inner_join(samp_for) %>% 
   group_by(region,site) %>% 
 
 # Calculate average predictor values during each sampling interval
@@ -162,7 +153,7 @@ phy_site_year <- phy_df %>%
   left_join(pisc_df)
   
 phy_site_year_final <- phy_site_year %>% 
-  inner_join(samp_df %>% distinct(region,site,wateryear)) 
+  inner_join(samp_for %>% distinct(region,site,wateryear)) 
 
 summary(phy_site_year_final)
 

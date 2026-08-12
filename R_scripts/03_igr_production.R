@@ -169,6 +169,12 @@ prod_df <- bind_rows(prod_list)
 
 
 # Export  ----------------------------------------------------------------------
+
+# sample data
+samp_file <- paste0("fs_sample_info_",Sys.Date(),".rds")
+saveRDS(samp_df,file.path(export_dir,samp_file))
+
+# Production
 prod_file <- paste0("fsprod_igr_",Sys.Date(),".rds")
 saveRDS(prod_df,file.path(export_dir,prod_file))
 
