@@ -201,7 +201,9 @@ phy_reg_year <- phy_site_year_pca %>%
   group_by(region,wateryear) %>% 
   summarise(across(
     c(-site,-waterperiod),
-    ~mean(.x,na.rm=T))
+    ~mean(.x,na.rm=T)
+    ),
+    .groups = "drop"
   )
 
 
@@ -210,7 +212,9 @@ phy_year <- phy_site_year_pca %>%
   group_by(wateryear) %>% 
   summarise(across(
     c(-site,-region,-waterperiod),
-    ~mean(.x,na.rm=T))
+    ~mean(.x,na.rm=T)
+    ),
+    .groups = "drop"
     )
 
 
@@ -231,3 +235,4 @@ saveRDS(
   phy_year,
   file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
 )
+
