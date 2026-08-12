@@ -101,10 +101,10 @@ stack_list <- c(stack_list,stackJ)
 # Production input settings
 sp <- names(stack_list)
 cohort <- 30
-growth_iter <- 10
-prod_iter <- 10
+growth_iter <- 10000
+prod_iter <- 10000
 
-prod_list <- lapply(sp, function(s){
+prod_list2 <- lapply(sp, function(s){
   
   # Filter all data for one species
   samp <- samp_df
