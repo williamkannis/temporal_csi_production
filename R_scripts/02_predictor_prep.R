@@ -1,0 +1,213 @@
+#-------------------------------------------------------------------------------
+#
+#   Predictor preparation
+#
+#-------------------------------------------------------------------------------
+
+# AUTHOR: William K. Annis
+
+# CREATED: July 13, 2026
+
+# DESCRIPTION: 
+
+
+# House keeping  ---------------------------------------------------------------
+rm(list = ls())
+
+# Packages
+library(dplyr)
+devtools::load_all("~/Documents/work/R packages/secProd")
+
+# directores
+data_dir <- paste0(
+  "~/Documents/Work/Everglades post-doc/",
+  "Data analysis/Data cleaning/cleaned_data"
+)
+input_dir <- "input_data"
+export_dir <- "prod_data"
+
+# data
+len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
+pisc_df <- readRDS(file.path(data_dir,"pisc_cleaned_2026-07-13.rds"))
+phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
+hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-07-09.rds"))
+
+
+# Sampling interval  -----------------------------------------------------------
+
+samp_df <- len_df %>% 
+  left_join(hyd_df) %>% 
+  mutate(group_id = as.numeric(hydroperiod)) %>% 
+  group_by(region,site,wateryear,cum,group_id) %>% 
+  summarise(
+    date = mean(date,na.rm=T),
+    area = n_distinct(plot,throw),
+    .groups = "drop"
+  ) %>% 
+  sample_interval() %>% 
+  mutate(
+    interval_pred = round(interval / 30) * 30,
+    interval_pred = case_when(
+      interval_pred == 120 ~ 90,
+      interval_pred == 150 ~ 180,
+      T ~ interval_pred
+    )
+    )
+
+
+# site-level predictors --------------------------------------------------------
+
+phy_site <- phy_df %>% 
+  select(
+    region,
+    site,
+    wateryear,
+    cum,
+    depth_ave_30day,
+    depth_ave_60day,
+    depth_ave_90day,
+    depth_ave_180day,
+    dsldd,
+    lastdaydry,
+    peri_vol,
+    plt_cov) %>% 
+  
+# Summarize data from throw level to site level
+  group_by(region,site,wateryear,cum) %>% 
+  summarize(
+    across(everything(),~mean(.x,na.rm=T))
+  ) %>% 
+  mutate(across(everything(), ~ ifelse(is.nan(.x), NA, .x))) %>% 
+  inner_join(samp_df) %>% 
+  group_by(region,site) %>% 
+
+# Calculate average predictor values during each sampling interval
+  mutate(
+    across(
+      c(plt_cov,peri_vol,dsldd),
+      ~ {
+        nxt <- lead(.x,order_by = cum)
+        ifelse(
+          !is.na(.x) & !is.na(nxt),
+          (.x + nxt) / 2,
+          coalesce(.x, nxt)
+        )
+      },
+      .names = "{.col}_int"
+    ),
+
+# Create column for average depth at end of sampling intera
+    across(
+      contains("depth"),
+      ~lead(.x,order_by = cum),
+      .names = "{.col}_lead"
+      )
+  ) %>% 
+  ungroup() 
+
+# Assign depth leads based on sampling interval duration
+depth_names <- sapply(
+  phy_site$interval_pred, 
+  function(x) paste0("depth_ave_",x,"day_lead")
+  )
+phy_site$depth <- sapply(
+  seq_len(nrow(phy_site)),
+  function(i) {
+    if (!depth_names[i] %in% names(phy_site)) return(NA)
+    phy_site[[depth_names[i]]][i]
+  }
+  )
+
+# remove intermediate variables
+phy_site_final <- phy_site %>% 
+  select(
+    region,
+    site,
+    wateryear,
+    cum,
+    depth,
+    contains("_int")
+  )
+summary(phy_site_final)
+
+# TEMPORARY IMPUTE
+set.seed(999)
+phy_site_final <- group_impute(
+  phy_site_final,
+  plt_cov_int,
+  by = c(region,site,wateryear)
+  )
+phy_site_final <- group_impute(
+  phy_site_final,
+  peri_vol_int,
+  by = c(region,site,wateryear)
+  )
+phy_site_final <- phy_site_final %>% select(-impute)
+
+# Site/Year-level predictors ---------------------------------------------------
+phy_site_year <- phy_df %>% 
+  select(
+    region,
+    site,
+    wateryear,
+    waterperiod,
+    wet_sum_365day,
+    depth_ave_365day
+    ) %>% 
+  filter(waterperiod == 5) %>% 
+  group_by(wateryear,region,site) %>% 
+  summarize(
+    across(everything(),~mean(.x,na.rm=T))
+  ) %>% 
+  left_join(pisc_df)
+  
+phy_site_year_final <- phy_site_year %>% 
+  inner_join(samp_df %>% distinct(region,site,wateryear)) 
+
+summary(phy_site_year_final)
+
+a <- phy_year %>% 
+  filter(is.na(pisc_index)) %>% 
+  group_by(region,site) %>% 
+  summarize(across(everything(),~mean(.x,na.rm=T)))
+
+a <- phy_year %>% 
+  group_by(region,site) %>% 
+  summarize(
+    # across(everything(),~mean(.x,na.rm=T)),
+    n = sum(!is.na(pisc_index)))
+ 
+# Region-year level predictors  ------------------------------------------------
+phy_reg_year <- phy_site_year %>% 
+  group_by(region,wateryear) %>% 
+  summarise(across(
+    c(wet_sum_365day,depth_ave_365day,pisc_index),
+    ~mean(.x,na.rm=T))
+  )
+
+# Year-level predictors  -------------------------------------------------------
+phy_year <- phy_site_year %>% 
+  group_by(wateryear) %>% 
+  summarise(across(
+    c(wet_sum_365day,depth_ave_365day,pisc_index),
+    ~mean(.x,na.rm=T))
+    )
+  
+
+# Export  ----------------------------------------------------------------------
+saveRDS(
+  phy_site_final,
+  file.path(export_dir,paste0("phys_site_predictors_",Sys.Date(),".rds"))
+  )
+saveRDS(
+  phy_site_year_final,
+  file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
+  )
+saveRDS(
+  phy_reg_year,
+  file.path(export_dir,paste0("phys_regionyear_predictors_",Sys.Date(),".rds"))
+)
+saveRDS(
+  phy_year,
+  file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
+)
