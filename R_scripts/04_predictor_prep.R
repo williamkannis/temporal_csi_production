@@ -148,7 +148,7 @@ phy_site_year <- phy_df %>%
     waterperiod,
     wet_sum_365day,
     depth_ave_365day,
-    dsldd,
+    # dsldd,
     lastdaydry
     ) %>% 
   filter(waterperiod == 5) %>% 
@@ -192,7 +192,7 @@ points(pca_out, pch=19, display = "sites")
 text(pca_out, display = "species", col="blue") 
 
 # Extract pcs that explain atleast 75% of variation and create data.frame
-pca_result <-vegan::scores(pca_out,choices = c(1,2,3),display = "sites")
+pca_result <-vegan::scores(pca_out,choices = c(1,2),display = "sites")
 phy_site_year_pca <- cbind(phy_site_year_impute,pca_result)
 
 
@@ -236,3 +236,4 @@ saveRDS(
   file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
 )
 
+## LAG VARIBALE??

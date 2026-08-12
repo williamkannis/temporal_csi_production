@@ -12,7 +12,7 @@
 
 
 # Housekeeping  ----------------------------------------------------------------
-rm(list = ls())
+rm(list = ls()) 
 
 # Load in packages
 library(dplyr)
@@ -53,7 +53,14 @@ prod_all <- prod_for %>%
     across(contains("production"),sum)
   ) %>% 
   mutate(species = "all") %>% 
-  bind_rows(prod_for)
+  bind_rows(prod_for) %>% 
+  mutate(
+    ptob = production_mean/interval_biomass_mean,
+    ptob = case_when(
+      is.nan(ptob) ~ 0,
+      T ~ ptob
+    )
+    )
 
 
 # Add sample info to production data
@@ -166,7 +173,10 @@ input_list <- lapply(sp, function(s){
       mutate(int = 1) %>% 
       select(
         int,
-        wet_sum_365day
+        wet_sum_365day,
+        pisc_index
+        # PC1,
+        # PC2
       ) %>% 
         
       # scale and center data
@@ -200,7 +210,10 @@ input_list <- lapply(sp, function(s){
     R = n_distinct(site_df$reg_id),
     K = ncol(x_df),
     L = ncol(z_data[1,,]),
-    y= log(1000*site_df$production_mean+1),
+    # y= log(1000*site_df$production_mean+1),
+    # y= log(site_df$biomass_mean+1),
+    # y= log(1000*site_df$ptob+1),
+    y= site_df$ptob*100,
     yr = site_df$year_id,
     st = site_df$site_id,
     rg = reg_bridge,
@@ -224,9 +237,9 @@ sapply(stan_list,function(ls) sum(ls$y == 0)/length(ls$y)*100)
 
 # Run models  ------------------------------------------------------------------
 ## CHANGE TO STEM COUNT FOR PLT NOT COVER
-s <-"LUCGOO"
+s <-"all"
 
-out_list <- lapply(sp[1],function(s) {
+out_list <- lapply(sp[5],function(s) {
   stan_data <- stan_list[[s]]
   
   stan(
@@ -256,15 +269,17 @@ lapply(1:length(out_list),function(o){
       "tau_s",
       # "tau1",
       # "tau2",
-      "sigma",
+      "sigma"
       # "cor_mat",
       # "cor_mat1",
       # "cor_mat_s",
-      "mean_gt",
-      "sd_gt",
-      "min_gt",
-      "max_gt",
-      "neg_rep")
+      # "mean_gt",
+      # "sd_gt",
+      # "min_gt",
+      # "max_gt",
+      # "neg_rep"
+      ),
+    digits =3
     )
 }
 )
@@ -276,7 +291,7 @@ out_sum <- summary(out)[[1]]
 
 s <- sp[1]
 print(s)
-out <- out_list[[s]]
+out <- out_list[[1]]
 # loo::loo(out)
 post <- extract(out,c("y_rep","mu","residuals"))
 
