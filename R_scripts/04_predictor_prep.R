@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 #
-#   Predictor preparation  ### RENAME TO SCRIPT 4
+#   Predictor preparation
 #
 #-------------------------------------------------------------------------------
 
@@ -34,7 +34,6 @@ phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
 
 # Sampling interval  -----------------------------------------------------------
 
-## LOAD IN SAMPDF FROM PRODUCTION SCRIPT
 samp_for <- samp_df %>% 
   mutate(
     interval_pred = round(interval / 30) * 30,
