@@ -16,6 +16,7 @@ rm(list = ls())
 
 # Packages
 library(dplyr)
+devtools::load_all("~/Documents/work/R packages/secProd")
 
 # directores
 data_dir <- paste0(
@@ -35,6 +36,10 @@ phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
 # Sampling interval  -----------------------------------------------------------
 
 samp_for <- samp_df %>% 
+  left_join(
+    phy_df %>% distinct(region,site,wateryear,cum),
+    by = join_by(site,cum)
+    ) %>% 
   mutate(
     interval_pred = round(interval / 30) * 30,
     interval_pred = case_when(
@@ -147,14 +152,26 @@ phy_site_year <- phy_df %>%
   filter(waterperiod == 5) %>% 
   group_by(wateryear,region,site) %>% 
   summarize(
-    across(everything(),~mean(.x,na.rm=T))
+    across(everything(),~mean(.x,na.rm=T)),
+    .groups = "drop"
   ) %>% 
   left_join(pisc_df)
   
 phy_site_year_final <- phy_site_year %>% 
   inner_join(samp_for %>% distinct(region,site,wateryear)) 
-
 summary(phy_site_year_final)
+
+# TEMPORARY IMPUTE
+# set.seed(999)
+# a <- group_impute(
+#   phy_site_year_final,
+#   pisc_index,
+#   by = c(wateryear)
+# );summary(a)
+
+
+# Site-year PCA  ---------------------------------------------------------------
+
 
 
 # Region-year level predictors  ------------------------------------------------
@@ -164,6 +181,7 @@ phy_reg_year <- phy_site_year %>%
     c(wet_sum_365day,depth_ave_365day,pisc_index),
     ~mean(.x,na.rm=T))
   )
+
 
 # Year-level predictors  -------------------------------------------------------
 phy_year <- phy_site_year %>% 
