@@ -157,16 +157,14 @@ phy_site_year <- phy_df %>%
     across(everything(),~mean(.x,na.rm=T)),
     .groups = "drop"
   ) %>% 
-  left_join(pisc_df)
-  
-phy_site_year_final <- phy_site_year %>% 
+  left_join(pisc_df) %>% 
   inner_join(samp_for %>% distinct(region,site,wateryear)) 
-summary(phy_site_year_final)
+summary(phy_site_year)
 
 # TEMPORARY IMPUTE
 set.seed(999)
 phy_site_year_impute <- group_impute(
-  phy_site_year_final,
+  phy_site_year,
   pisc_index,
   by = c(region)
 ) %>% 
@@ -195,40 +193,26 @@ text(pca_out, display = "species", col="blue")
 
 # Extract pcs that explain atleast 75% of variation and create data.frame
 pca_result <-vegan::scores(pca_out,choices = c(1,2,3),display = "sites")
-pca_df <- cbind(phy_site_year_impute,pca_result)
+phy_site_year_pca <- cbind(phy_site_year_impute,pca_result)
 
 
 # Region-year level predictors  ------------------------------------------------
-phy_reg_year <- pca_df %>% 
+phy_reg_year <- phy_site_year_pca %>% 
   group_by(region,wateryear) %>% 
   summarise(across(
     c(-site,-waterperiod),
     ~mean(.x,na.rm=T))
   )
 
-# phy_reg_year <- phy_site_year %>% 
-#   group_by(region,wateryear) %>% 
-#   summarise(across(
-#     c(wet_sum_365day,depth_ave_365day,pisc_index),
-#     ~mean(.x,na.rm=T))
-#   )
-
 
 # Year-level predictors  -------------------------------------------------------
-phy_year <- pca_df %>% 
+phy_year <- phy_site_year_pca %>% 
   group_by(wateryear) %>% 
   summarise(across(
     c(-site,-region,-waterperiod),
     ~mean(.x,na.rm=T))
     )
 
-# phy_year <- phy_site_year %>% 
-#   group_by(wateryear) %>% 
-#   summarise(across(
-#     c(wet_sum_365day,depth_ave_365day,pisc_index),
-#     ~mean(.x,na.rm=T))
-#   )
-  
 
 # Export  ----------------------------------------------------------------------
 saveRDS(
@@ -236,7 +220,7 @@ saveRDS(
   file.path(export_dir,paste0("phys_site_predictors_",Sys.Date(),".rds"))
   )
 saveRDS(
-  pca_df, #phy_site_year_final,
+  phy_site_year_pca, 
   file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
   )
 saveRDS(
