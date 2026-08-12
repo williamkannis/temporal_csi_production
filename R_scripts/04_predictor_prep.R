@@ -147,7 +147,9 @@ phy_site_year <- phy_df %>%
     wateryear,
     waterperiod,
     wet_sum_365day,
-    depth_ave_365day
+    depth_ave_365day,
+    dsldd,
+    lastdaydry
     ) %>% 
   filter(waterperiod == 5) %>% 
   group_by(wateryear,region,site) %>% 
@@ -162,34 +164,70 @@ phy_site_year_final <- phy_site_year %>%
 summary(phy_site_year_final)
 
 # TEMPORARY IMPUTE
-# set.seed(999)
-# a <- group_impute(
-#   phy_site_year_final,
-#   pisc_index,
-#   by = c(wateryear)
-# );summary(a)
+set.seed(999)
+phy_site_year_impute <- group_impute(
+  phy_site_year_final,
+  pisc_index,
+  by = c(region)
+) %>% 
+  select(-impute)
+
 
 
 # Site-year PCA  ---------------------------------------------------------------
 
+# Use full pisc and hydrology data sets to conduct PCA on biological and
+# hydrology variables
+
+# Prepare data input
+pca_input <-phy_site_year_impute %>% 
+  select(-wateryear, -region, -site,  -waterperiod)
+
+# Run pca
+pca_out <- vegan::rda(pca_input,scale = T)
+
+# Examine results
+summary(pca_out)
+pca_out$CA$v
+plot(pca_out, type = "n") 
+points(pca_out, pch=19, display = "sites") 
+text(pca_out, display = "species", col="blue") 
+
+# Extract pcs that explain atleast 75% of variation and create data.frame
+pca_result <-vegan::scores(pca_out,choices = c(1,2,3),display = "sites")
+pca_df <- cbind(phy_site_year_impute,pca_result)
 
 
 # Region-year level predictors  ------------------------------------------------
-phy_reg_year <- phy_site_year %>% 
+phy_reg_year <- pca_df %>% 
   group_by(region,wateryear) %>% 
   summarise(across(
-    c(wet_sum_365day,depth_ave_365day,pisc_index),
+    c(-site,-waterperiod),
     ~mean(.x,na.rm=T))
   )
 
+# phy_reg_year <- phy_site_year %>% 
+#   group_by(region,wateryear) %>% 
+#   summarise(across(
+#     c(wet_sum_365day,depth_ave_365day,pisc_index),
+#     ~mean(.x,na.rm=T))
+#   )
+
 
 # Year-level predictors  -------------------------------------------------------
-phy_year <- phy_site_year %>% 
+phy_year <- pca_df %>% 
   group_by(wateryear) %>% 
   summarise(across(
-    c(wet_sum_365day,depth_ave_365day,pisc_index),
+    c(-site,-region,-waterperiod),
     ~mean(.x,na.rm=T))
     )
+
+# phy_year <- phy_site_year %>% 
+#   group_by(wateryear) %>% 
+#   summarise(across(
+#     c(wet_sum_365day,depth_ave_365day,pisc_index),
+#     ~mean(.x,na.rm=T))
+#   )
   
 
 # Export  ----------------------------------------------------------------------
@@ -198,7 +236,7 @@ saveRDS(
   file.path(export_dir,paste0("phys_site_predictors_",Sys.Date(),".rds"))
   )
 saveRDS(
-  phy_site_year_final,
+  pca_df, #phy_site_year_final,
   file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
   )
 saveRDS(
