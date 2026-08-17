@@ -139,6 +139,7 @@ phy_site_final <- group_impute(
   )
 phy_site_final <- phy_site_final %>% select(-impute)
 
+
 # Site/Year-level predictors ---------------------------------------------------
 phy_site_year <- phy_df %>% 
   select(
@@ -157,9 +158,11 @@ phy_site_year <- phy_df %>%
     across(everything(),~mean(.x,na.rm=T)),
     .groups = "drop"
   ) %>% 
-  left_join(pisc_df) %>% 
-  inner_join(samp_for %>% distinct(region,site,wateryear)) 
+  left_join(pisc_df) # %>%
+  # inner_join(samp_for %>% distinct(region,site,wateryear)) 
 summary(phy_site_year)
+
+
 
 # TEMPORARY IMPUTE
 set.seed(999)
@@ -170,16 +173,33 @@ phy_site_year_impute <- group_impute(
 ) %>% 
   select(-impute)
 
+# Create lag effects
+phy_site_year_lag <- phy_site_year_impute %>% 
+  group_by(region,site) %>% 
+  mutate(
+    across(
+      .cols = c(wet_sum_365day,depth_ave_365day,lastdaydry,pisc_index),
+      .fns = ~lag(.x,order_by = wateryear),
+      .names = "{.col}_lag"
+    ),
+  ) %>% 
+  ungroup() %>% 
+  inner_join(samp_for %>% distinct(region,site,wateryear)) 
 
+# Check for correlation
+phy_site_year_lag %>% 
+  select(-wateryear, -region, -site,  -waterperiod) %>% 
+  cor(use = "complete.obs")
 
 # Site-year PCA  ---------------------------------------------------------------
 
 # Use full pisc and hydrology data sets to conduct PCA on biological and
 # hydrology variables
-
 # Prepare data input
-pca_input <-phy_site_year_impute %>% 
-  select(-wateryear, -region, -site,  -waterperiod)
+pca_input <-phy_site_year_lag %>% 
+  select(-wateryear, -region, -site,  -waterperiod) %>% 
+  select(!contains("lag"))
+
 
 # Run pca
 pca_out <- vegan::rda(pca_input,scale = T)
@@ -193,7 +213,7 @@ text(pca_out, display = "species", col="blue")
 
 # Extract pcs that explain atleast 75% of variation and create data.frame
 pca_result <-vegan::scores(pca_out,choices = c(1,2),display = "sites")
-phy_site_year_pca <- cbind(phy_site_year_impute,pca_result)
+phy_site_year_pca <- cbind(phy_site_year_lag,pca_result)
 
 
 # Region-year level predictors  ------------------------------------------------
@@ -206,6 +226,11 @@ phy_reg_year <- phy_site_year_pca %>%
     .groups = "drop"
   )
 
+# Check for correlation
+phy_reg_year %>% 
+  select(-wateryear, -region) %>% 
+  cor(use = "complete.obs")
+
 
 # Year-level predictors  -------------------------------------------------------
 phy_year <- phy_site_year_pca %>% 
@@ -216,6 +241,11 @@ phy_year <- phy_site_year_pca %>%
     ),
     .groups = "drop"
     )
+
+# Check for correlation
+phy_year %>% 
+  select(-wateryear) %>% 
+  cor(use = "complete.obs")
 
 
 # Export  ----------------------------------------------------------------------
@@ -236,4 +266,3 @@ saveRDS(
   file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
 )
 
-## LAG VARIBALE??
