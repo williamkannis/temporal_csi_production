@@ -16,7 +16,9 @@ rm(list = ls())
 
 # Load in packages
 library(dplyr)
+library(purrr)
 library(abind)
+library(jsonlite)
 
 # directories
 mod_dir <- "stan_scripts"
@@ -224,4 +226,16 @@ zbridge_list <-input_list_t$zbridge
 
 # Export  ----------------------------------------------------------------------
 
+# For analysis on HPC
+lapply(1:n_cb,function(i){
+  file_name <- paste0(
+    names(stan_list)[i],
+    "_input_data.json"
+    )
+  write_json(
+    stan_list[[i]],
+    file.path(export_dir,file_name)
+  )
+}
+)
 
