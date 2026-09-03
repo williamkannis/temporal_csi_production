@@ -31,15 +31,17 @@ plot_dir <- "figures"
 prod_df <- 
   readRDS(file.path(input_dir,"fsprod_igr_2026-07-13.rds"))
 phy_site <- 
-  readRDS(file.path(input_dir,"phys_site_predictors_2026-08-12.rds"))
+  readRDS(file.path(input_dir,"phys_site_predictors_2026-08-17.rds"))
 phy_year <- 
-  readRDS(file.path(input_dir,"phys_year_predictors_2026-08-12.rds"))
+  readRDS(file.path(input_dir,"phys_year_predictors_2026-08-17.rds"))
 phy_reg_year <- 
-  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-08-12.rds"))
+  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-08-17.rds")) %>% 
+  mutate(wet_sum_365day_delta = wet_sum_365day - wet_sum_365day_lag)
+
+phy_reg_year %>% 
+  select(-region,-wateryear) %>% cor(use = "complete.obs")
 
 # Prep data  -------------------------------------------------------------------
-
-
 
 # Remove NA production estimates
 prod_for <- prod_df %>% filter(!is.na(production_mean))
@@ -67,8 +69,18 @@ prod_all <- prod_for %>%
 samp_df <- phy_site %>% 
   distinct(wateryear,region,site,cum) %>% 
   filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
+  filter(wateryear !=1995) %>%  ## TEMP ASK JOEL FOR LAG DATA FOR THIS YEAR
   left_join(prod_all, by = join_by(site,cum)) %>% 
   filter(!is.na(production_mean))
+
+samp_df %>% 
+  group_by(species) %>% 
+  summarize(p = mean(production_mean,na.rm=T)*1000)
+
+a <- samp_df %>% filter(species=="JORFLO")
+plot(a$biomass_mean,a$production_mean)
+hist(a$production_mean*365/a$biomass_mean,breaks = 40)
+# Model input lists  -----------------------------------------------------------
 
 # Create a stan input data list for each species
 sp <- unique(samp_df$species)
@@ -174,7 +186,9 @@ input_list <- lapply(sp, function(s){
       select(
         int,
         wet_sum_365day,
+        # wet_sum_365day_delta,
         pisc_index
+        # pisc_index_lag
         # PC1,
         # PC2
       ) %>% 
@@ -204,16 +218,19 @@ input_list <- lapply(sp, function(s){
   # )
   
   stan_data <- list(
+    # M = 50,
+    M = 60,
     N = nrow(site_df),
     `T` = n_distinct(site_df$year_id),
     S = n_distinct(site_df$site_id),
     R = n_distinct(site_df$reg_id),
     K = ncol(x_df),
     L = ncol(z_data[1,,]),
+    # y= 1000*site_df$production_mean,
     # y= log(1000*site_df$production_mean+1),
     # y= log(site_df$biomass_mean+1),
-    # y= log(1000*site_df$ptob+1),
-    y= site_df$ptob*100,
+    y= log(1000*site_df$ptob+1),
+    # y= site_df$ptob*100,
     yr = site_df$year_id,
     st = site_df$site_id,
     rg = reg_bridge,
@@ -244,8 +261,9 @@ out_list <- lapply(sp[5],function(s) {
   
   stan(
     file = file.path(mod_dir,"mvn_second_level_regyear_effects.stan"),
+    # file = file.path(mod_dir,"tweedie_mvn_second_level_regyear_effects.stan"),
     data = stan_data,
-    iter = 5000,
+    iter = 3000,
     warmup = 1000,
     chains =4,
     # control = list(adapt_delta = .97),  
@@ -258,18 +276,20 @@ lapply(1:length(out_list),function(o){
   print(names(out_list)[o])
   check_hmc_diagnostics(out_list[[o]])
   })
-
+0=5
 lapply(1:length(out_list),function(o){
-  print(sp[o])
+  print(sp[5])
   print(
-    out_list[[o]],
+    out_list[[1]],
     pars = c(
       "gamma",
       "tau",
-      "tau_s",
+      "tau_s"
       # "tau1",
       # "tau2",
-      "sigma"
+      # "sigma",
+      # "phi",
+      # "theta"
       # "cor_mat",
       # "cor_mat1",
       # "cor_mat_s",
@@ -285,11 +305,44 @@ lapply(1:length(out_list),function(o){
 )
 out_sum <- summary(out)[[1]]
 
+lambda_draws <- posterior::as_draws_matrix(out_list[[1]]$draws("lambda"))
+
+out <- out_list[[1]]
+lambda_draws <- extract(out,"lambda")[[1]]
+
+max_lambda <- quantile(lambda_draws, 0.999)
+
+M_required <- qpois(
+  1 - 1e-10,
+  lambda = max_lambda
+)
+
+lambda_max <- quantile(lambda_draws, 0.999)
+
+data.frame(
+  tolerance = c(1e-6, 1e-8, 1e-10, 1e-12),
+  M = c(
+    qpois(1 - 1e-6, lambda_max),
+    qpois(1 - 1e-8, lambda_max),
+    qpois(1 - 1e-10, lambda_max),
+    qpois(1 - 1e-12, lambda_max)
+  )
+)
+M=6
+poisson_tail <- 1 - ppois(
+  M,
+  lambda = lambda_draws
+)
+
+quantile(
+  poisson_tail,
+  probs = c(0.5, 0.9, 0.99, 0.999, 1)
+)
 
 # Model fit --------------------------------------------------------------------
 
 
-s <- sp[1]
+s <- sp[5]
 print(s)
 out <- out_list[[1]]
 # loo::loo(out)
@@ -301,7 +354,7 @@ bayesplot::ppc_ecdf_overlay(
   stan_list[[s]]$y,
   post$y_rep[1:100,]
 )
-a <-bayesplot::ppc_dens_overlay(
+bayesplot::ppc_dens_overlay(
   stan_list[[s]]$y,
   post$y_rep[1:100,]
   )
