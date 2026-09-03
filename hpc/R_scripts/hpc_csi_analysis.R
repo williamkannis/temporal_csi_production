@@ -1,31 +1,24 @@
 #-------------------------------------------------------------------------------
-#
 #   Run stan models using HPC cluster
-#
 #-------------------------------------------------------------------------------
 
-# AUTHOR: William K. Annis
+message("Start model run script")
 
-# CREATED: July 13, 2026
-
-# DESCRIPTION: 
-
+# For use with SBATCH on Slurm Scheduler. 
+# DO NO RUN OUTSIDE OF SLURM.
 
 # Housekeeping  ----------------------------------------------------------------
-rm(list = ls()) 
-
-message("Start model run script")
 
 # Load in packages
 library(dplyr)
 library(purrr)
 library(abind)
-library(cmdrstan)
+library(cmdstanr)
 
 # directories
-mod_dir <- "stan_scripts"
-input_dir <- "stan_inputs"
-out_dir <- "stan_outputs"
+mod_dir <- "hpc/stan_scripts"
+input_dir <- "hpc/data"
+out_dir <- "hpc/stan_outputs"
 
 # Data
 samp_df <- 
@@ -35,43 +28,40 @@ phy_reg_year <-
 
 message("Data files loaded in")
 
+
 # Select specied dataset  ------------------------------------------------------
 
 # Shell argument for selecting species and response of choice
 arg <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 
-data <- list.files()[arg]
-
+file_name <- list.files(
+  input_dir,
+  pattern = "\\.json$",
+  full.names = TRUE
+  )[arg]
 
 
 # Run models  ------------------------------------------------------------------
 
-message("Start stan model run")
-stan_out <- mod$
-stan_out <- stan(
-    file = file.path(
-      mod_dir,
-      "tweedie_mvn_second_level_regyear_effects_opt.stan"
-      ),
-    data = stan_data,
-    iter = 3000,
-    warmup = 1000,
-    chains =4,
-    cores = 4
-  )
+# Load in model
+message("Compiling code")
+mod <- cmdstan_model()
 
+# Run model
+message("Start stan model run")
+out <- mod$sample(
+  data = file_name,
+  iter_sampling = 2000, 
+  iter_warmup = 1000,
+  chains = 4,
+  parallel_chains = 4 
+)
 message("stan model run complete")
+
 
 # Export model  ----------------------------------------------------------------
 
-# Package model outputs and bridges
-out <- list(
-  stan_out = stan_out,
-  x_bridge = x_bridge,
-  z_bridge = z_bridge
-)
-
 # Name file and export
-out_name <- paste(sp,rs,"out_list.rds",sep = "_")
+out_name <- gsub("_input_data.json",file_name)
 saveRDS(out,file.path(out_dir,out_name))
 
