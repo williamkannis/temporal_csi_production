@@ -52,6 +52,7 @@ scp_upload(
 )
 
 # Install packages  ------------------------------------------------------------
+
 ssh_exec_wait(
   session,
   command = paste(
@@ -68,8 +69,6 @@ ssh_exec_wait(
     )
   )
 )
-
-
 
 
 # Run analyses on cluster  -----------------------------------------------------
