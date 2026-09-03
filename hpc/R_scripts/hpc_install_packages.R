@@ -34,7 +34,7 @@ print(.libPaths())
 
 
 # Check if packages are installed
-req_pck <- c("dplyr","purrr","abind","cmdstanr")
+req_pck <- c("cmdstanr")
 installed <- installed.packages()[, "Package"]
 missing_pkgs <- req_pck[!(req_pck %in% installed)]
 
@@ -49,19 +49,8 @@ if (length(missing_pkgs) > 0) {
       Ncpus = n_cores
       )
   }
-  other_pkgs <- missing_pkgs[missing_pkgs != "cmdstanr"]
-  
-  if (length(other_pkgs) > 0) {
-    install.packages(
-      other_pkgs,
-      lib = user_lib,
-      repos = "https://cloud.r-project.org",
-      Ncpus = n_cores
-    )
-  }
 } else {
   message("All dependencies are already installed on the cluster!")
 }
-
 
 
