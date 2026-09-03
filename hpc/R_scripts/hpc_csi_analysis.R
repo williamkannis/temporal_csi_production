@@ -10,9 +10,6 @@ message("Start model run script")
 # Housekeeping  ----------------------------------------------------------------
 
 # Load in packages
-library(dplyr)
-library(purrr)
-library(abind)
 library(cmdstanr)
 
 # directories
@@ -20,16 +17,7 @@ mod_dir <- "hpc/stan_scripts"
 input_dir <- "hpc/data"
 out_dir <- "hpc/stan_outputs"
 
-# Data
-samp_df <- 
-  readRDS(file.path(input_dir,""))
-phy_reg_year <- 
-  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-08-17.rds"))
-
-message("Data files loaded in")
-
-
-# Select specied dataset  ------------------------------------------------------
+# Select specified dataset  ------------------------------------------------------
 
 # Shell argument for selecting species and response of choice
 arg <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -62,6 +50,9 @@ message("stan model run complete")
 # Export model  ----------------------------------------------------------------
 
 # Name file and export
-out_name <- gsub("_input_data.json",file_name)
-saveRDS(out,file.path(out_dir,out_name))
+out_name <-  file_name |>
+  gsub("hpc/data",out_dir,x=_) |>
+  gsub("_input_data.json","_stan_out.rds",x=_)
+  
+saveRDS(out,out_name)
 
