@@ -63,7 +63,7 @@ ssh_exec_wait(
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && module load webproxy &&",
-        " Rscript /gpfs/home/wka25/hpc_install_packages.R"
+        " Rscript /gpfs/home/wka25/hpc/R_scripts/hpc_install_packages.R"
       )
     )
   )
@@ -86,7 +86,7 @@ ssh_exec_wait(
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/wka25",
-        "/hpc_compile_model.R"
+        "hpc/R_scripts/hpc_compile_model.R"
       )
     )
   )
@@ -107,7 +107,7 @@ ssh_exec_wait(
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/my_project/R/hpc_csi_analysis.R"
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R"
       )
     )
   )
