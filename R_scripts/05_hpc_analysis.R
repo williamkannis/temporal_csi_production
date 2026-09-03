@@ -6,7 +6,7 @@
 
 # AUTHOR: William K. Annis
 
-# CREATED: July 13, 2026
+# CREATED: Sept 3, 2026
 
 # DESCRIPTION: 
 
@@ -29,18 +29,26 @@ session <- ssh_connect("wka25@hpc-login.rcc.fsu.edu")
 
 
 # Hpc uploads  -----------------------------------------------------------------
-# Upload package scripts (ADD ALL SCRIPTS)
-scp_upload(
-  session = session,
-  files = "hpc_scripts/hpc_install_packages.R",
-  to = "/gpfs/home/wka25/hpc_install_packages.R"
-)
 
-# Upload data
+# # Upload package scripts (ADD ALL SCRIPTS)
+# scp_upload(
+#   session = session,
+#   files = "hpc_scripts/hpc_install_packages.R",
+#   to = "/gpfs/home/wka25/hpc_install_packages.R"
+# )
+# 
+# # Upload data
+# scp_upload(
+#   session = session,
+#   files = "hpc_scripts/hpc_install_packages.R",
+#   to = "/gpfs/home/wka25/hpc_install_packages.R"
+# )
+
+# Upload data and scripts
 scp_upload(
   session = session,
-  files = "hpc_scripts/hpc_install_packages.R",
-  to = "/gpfs/home/wka25/hpc_install_packages.R"
+  files = "hpc",
+  to = "/gpfs/home/wka25/"
 )
 
 # Install packages  ------------------------------------------------------------
@@ -105,20 +113,16 @@ ssh_exec_wait(
   )
 )
 
-# Retrieve results  ------------------------------------------------------------
-
-# Download model outputs
-
-
-# export model outputs
-saveRDS()
-
 
 # Clean up cluster  ------------------------------------------------------------
 
-# Delete package installation script
+# Download model outputs
+ssh_exec_wait()
+
+# Remove all scripts and data. 
+# WARNING: ENSURE THAT RESULTS HAVE DOWNLOADED FIRST
 ssh_exec_wait(
   session,
-  command = "rm /gpfs/home/wka25/hpc_install_packages.R"
+  command = "rm /gpfs/home/wka25/hpc"
 )
 
