@@ -21,9 +21,8 @@ library(abind)
 library(jsonlite)
 
 # directories
-mod_dir <- "stan_scripts"
 input_dir <- "prod_data"
-export_dir <- "hpc/stan_input"
+export_dir <- "hpc/data"
 
 # Data
 prod_df <- 
@@ -100,7 +99,6 @@ input_list <- lapply(1:n_cb, function(i){
     arrange(region,site,cum) %>% 
     mutate(site_id = cur_group_id(),.by = c(region,site)) %>% 
     mutate(year_id = cur_group_id(),.by = c(wateryear)) %>% 
-    # mutate(regyear_id = cur_group_id(),.by = c(region,wateryear)) %>% 
     mutate(reg_id = cur_group_id(),.by = c(region)) %>% 
     
     # merge in site level predictors
@@ -115,9 +113,7 @@ input_list <- lapply(1:n_cb, function(i){
   
   # Add year id to year level predictors
   regyear_df <- site_df %>% 
-    # distinct(region,wateryear,regyear_id) %>% 
     distinct(region,wateryear,reg_id,year_id) %>% 
-    # arrange(regyear_id) %>% 
     arrange(reg_id,year_id) %>% 
     left_join(phy_reg_year,by = join_by(region,wateryear))
   
@@ -139,17 +135,6 @@ input_list <- lapply(1:n_cb, function(i){
     mutate(across(!int,~as.numeric(scale(.x))))
   
   # Select 2nd level predictors (create column of 1 for intercept) and create
-  # array for region specific
-  # z_df <- regyear_df %>% 
-  #   mutate(int = 1) %>% 
-  #   select(
-  #     int,
-  #     wet_sum_365day
-  #   ) %>% 
-  # 
-  # # scale and center data
-  # mutate(across(!int,~as.numeric(scale(.x))))
-  
   z_list <- lapply(1:max(reg_bridge), function(r){
     z_df <- regyear_df %>% 
       filter(reg_id == r) %>% 
@@ -157,11 +142,7 @@ input_list <- lapply(1:n_cb, function(i){
       select(
         int,
         wet_sum_365day,
-        # wet_sum_365day_delta,
         pisc_index
-        # pisc_index_lag
-        # PC1,
-        # PC2
       ) %>% 
       
       # scale and center data
@@ -172,24 +153,7 @@ input_list <- lapply(1:n_cb, function(i){
   
   
   ## Stan list  ##
-  # stan <-list(
-  #   N = nrow(site_df),
-  #   L = n_distinct(site_df$year_id),
-  #   O = n_distinct(site_df$site_id),
-  #   P = n_distinct(site_df$regyear_id),
-  #   K = ncol(x_df),
-  #   J = ncol(z_df),
-  #   y= log(1000*site_df$production_mean+1),
-  #   # y=site_df$production_mean*1000,
-  #   pp = site_df$regyear_id,
-  #   ll = site_df$year_id,
-  #   oo = site_df$site_id,
-  #   x = x_df,
-  #   z = z_df
-  # )
-  
   stan_data <- list(
-    # M = 50,
     M = 60,
     N = nrow(site_df),
     `T` = n_distinct(site_df$year_id),
@@ -211,31 +175,29 @@ input_list <- lapply(1:n_cb, function(i){
 )
 
 
-# Format input lists  ----------------------------------------------------------
+# Export  ----------------------------------------------------------------------
 
+# Prepare list for exporting
 names(input_list) <- apply(cb, 1, paste, collapse = "_")
 input_list_t <- transpose(input_list)
 
-# For anlaysis on HPC
+# HPC analysis data
 stan_list <- input_list_t$stan_data
-
-# For plot labels
-xbridge_list <-input_list_t$xbridge
-zbridge_list <-input_list_t$zbridge
-
-
-# Export  ----------------------------------------------------------------------
-
-# For analysis on HPC
 lapply(1:n_cb,function(i){
   file_name <- paste0(
     names(stan_list)[i],
     "_input_data.json"
-    )
+  )
   write_json(
     stan_list[[i]],
     file.path(export_dir,file_name)
   )
 }
 )
+
+# Plot label data bridges
+xbridge_list <-input_list_t$xbridge
+zbridge_list <-input_list_t$zbridge
+saveRDS(xbridge_list, file.path())
+saveRDS(zbridge_list, file.path())
 
