@@ -37,12 +37,14 @@ print(.libPaths())
 
 
 # Check if packages are installed  ---------------------------------------------
+
 req_pck <- c("cmdstanr")
 installed <- installed.packages()[, "Package"]
 missing_pkgs <- req_pck[!(req_pck %in% installed)]
 
 
 # Install missing packages  ----------------------------------------------------
+
 if (length(missing_pkgs) > 0) {
   message("Installing missing packages: ", paste(missing_pkgs, collapse = ", "))
   if("cmdstanr" %in% missing_pkgs) {
