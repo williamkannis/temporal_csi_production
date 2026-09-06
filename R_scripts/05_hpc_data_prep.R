@@ -18,7 +18,6 @@ rm(list = ls())
 library(dplyr)
 library(purrr)
 library(abind)
-library(jsonlite)
 
 # directories
 input_dir <- "prod_data"
@@ -186,12 +185,12 @@ stan_list <- input_list_t$stan_data
 lapply(1:n_cb,function(i){
   file_name <- paste0(
     names(stan_list)[i],
-    "_input_data.json"
+    "_input_data.rds"
   )
-  write_json(
+  saveRDS(
     stan_list[[i]],
     file.path(export_dir,file_name)
-  )
+    )
 }
 )
 
