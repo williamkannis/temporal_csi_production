@@ -4,6 +4,7 @@
 
 message("============================================================")
 message("Starting hpc_cis_analysis.R")
+message("M = ",commandArgs(trailingOnly = TRUE))
 message("Start time: ", Sys.time())
 message("Slurm job ID: ", Sys.getenv("SLURM_JOB_ID"))
 message("Slurm array job ID: ", Sys.getenv("SLURM_ARRAY_JOB_ID"))
@@ -27,23 +28,41 @@ mod_dir <- "hpc/stan_scripts"
 input_dir <- "hpc/data"
 out_dir <- "hpc/stan_outputs"
 
+
+
 # Select specified dataset  ------------------------------------------------------
 
-# Shell argument for selecting species and response of choice
-arg <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+# Shell job id for selecting species and response of choice
+task <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 
-message("[", Sys.time(), "] Selecting input file for array task ", arg)
+message("[", Sys.time(), "] Selecting input file for array task ", task)
 file_name <- list.files(
   input_dir,
   pattern = "\\.rds$",
   full.names = TRUE
-)[arg]
+)[task]
 message("[", Sys.time(), "] Input file: ", file_name)
 
 # Load in data
 message("[", Sys.time(), "] Loading data...")
 data <- readRDS(file_name)
 message("[", Sys.time(), "] Data loaded")
+
+# Set selected value for m
+message("[", Sys.time(), "] Setting M value based on shell argument...")
+arg <- commandArgs(trailingOnly = TRUE)
+if (length(arg) < 1) {
+  stop("Missing required argument M")
+}
+if (length(arg) > 1) {
+  stop("Multiple values supplied for argument M")
+}
+M <- as.numeric(arg)
+if (is.na(arg)) {
+  stop("Argument 'value' must be numeric")
+}
+data$M <- M
+message("[", Sys.time(), "] Set M in data to ", M)
 
 
 # Run models  ------------------------------------------------------------------
@@ -72,7 +91,8 @@ out <- mod$sample(
   iter_sampling = n_iter, 
   iter_warmup = n_warm,
   chains = chains,
-  parallel_chains = 4 
+  parallel_chains = 4,
+  init = 0.5
 )
 
 end_time <- Sys.time()
@@ -103,7 +123,7 @@ tree <- sum(diag$num_max_treedepth)
 # combined issues
 issues <- div + high_rhat + low_ess
 
-if (issue == 0) {
+if (issues == 0) {
   message("============================================================")
   message("No issues dectected:")
   message("  Rhat > 1.1: ", high_rhat)
@@ -126,9 +146,12 @@ if (issue == 0) {
 # Name file and export
 out_name <-  file_name |>
   gsub("hpc/data",out_dir,x=_) |>
-  gsub("_input_data","_stan_out",x=_)
+  gsub(
+    "_input_data",
+    paste0("_stan_out_M",M),
+    x=_)
 
-saveRDS(out,out_name)
+out$save_object(out_name)
 message("[", Sys.time(), "] Model successfully saved:")
 message("  ", out_name)
 
