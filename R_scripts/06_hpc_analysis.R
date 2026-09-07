@@ -12,14 +12,10 @@
 
 
 # Housekeeping  ----------------------------------------------------------------
-rm(list = ls()) 
+rm(list = ls())
 
 # Load in packages
 library(ssh)
-
-# directories
-mod_dir <- "hpc_scripts"
-export_dir <- "hpc/stan_output"
 
 
 # HPC configuration  -----------------------------------------------------------
@@ -30,26 +26,12 @@ session <- ssh_connect("wka25@hpc-login.rcc.fsu.edu")
 
 # Hpc uploads  -----------------------------------------------------------------
 
-# # Upload package scripts (ADD ALL SCRIPTS)
-# scp_upload(
-#   session = session,
-#   files = "hpc_scripts/hpc_install_packages.R",
-#   to = "/gpfs/home/wka25/hpc_install_packages.R"
-# )
-# 
-# # Upload data
-# scp_upload(
-#   session = session,
-#   files = "hpc_scripts/hpc_install_packages.R",
-#   to = "/gpfs/home/wka25/hpc_install_packages.R"
-# )
-
-# Upload data and scripts
 scp_upload(
   session = session,
   files = "hpc",
   to = "/gpfs/home/wka25/"
 )
+
 
 # Install packages  ------------------------------------------------------------
 
@@ -73,6 +55,9 @@ ssh_exec_wait(
 
 # Run analyses on cluster  -----------------------------------------------------
 
+# Set M value for all jobs
+M <- 60
+
 # Compile models
 ssh_exec_wait(
   session,
@@ -85,7 +70,7 @@ ssh_exec_wait(
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/wka25",
-        "hpc/R_scripts/hpc_compile_model.R"
+        "/hpc/R_scripts/hpc_compile_model.R"
       )
     )
   )
@@ -96,17 +81,18 @@ ssh_exec_wait(
   session,
   command = paste(
     "sbatch",
-    "--array=1-21",
+    "--array=1-14",
     "--cpus-per-task=4",
     "--mem=8G",
-    "--time=2:00:00",
+    "--time=3:00:00",
     "--job-name=production",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
     "--wrap",
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/hpc/R_scripts/hpc_csi_analysis.R"
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R ",
+        M
       )
     )
   )
@@ -116,12 +102,16 @@ ssh_exec_wait(
 # Clean up cluster  ------------------------------------------------------------
 
 # Download model outputs
-ssh_exec_wait()
+scp_download(
+  session = session,
+  files = "/gpfs/home/wka25/hpc/stan_outputs",
+  to = "."
+)
 
 # Remove all scripts and data. 
 # WARNING: ENSURE THAT RESULTS HAVE DOWNLOADED FIRST
 ssh_exec_wait(
   session,
-  command = "rm /gpfs/home/wka25/hpc"
+  command = "rm -rf /gpfs/home/wka25/hpc"
 )
 
