@@ -73,7 +73,8 @@ samp_df <- phy_site %>%
 # Number of species response combinations
 cb <- expand.grid(
   unique(samp_df$species),
-  c("production_mean","biomass_mean","ptob")
+  # c("production_mean","biomass_mean","ptob")
+  c("production_mean","biomass_mean")
 )
 n_cb <- nrow(cb)
 
@@ -153,7 +154,7 @@ input_list <- lapply(1:n_cb, function(i){
   
   ## Stan list  ##
   stan_data <- list(
-    M = 60,
+    # M = 60,
     N = nrow(site_df),
     `T` = n_distinct(site_df$year_id),
     S = n_distinct(site_df$site_id),
