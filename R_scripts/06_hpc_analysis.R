@@ -56,7 +56,7 @@ ssh_exec_wait(
 # Run analyses on cluster  -----------------------------------------------------
 
 # Set M value for all jobs
-M <- 60
+M <- 100
 
 # Compile models
 ssh_exec_wait(
@@ -76,23 +76,88 @@ ssh_exec_wait(
   )
 )
 
-# Model runs
+# Production Model runs
 ssh_exec_wait(
   session,
   command = paste(
     "sbatch",
-    "--array=1-14",
+    "--array=1-7",
     "--cpus-per-task=4",
     "--mem=8G",
-    "--time=3:00:00",
+    "--time=9:00:00",
     "--job-name=production",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
     "--wrap",
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/hpc/R_scripts/hpc_csi_analysis.R ",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R production ",
         M
+      )
+    )
+  )
+)
+
+# Biomass Model runs
+ssh_exec_wait(
+  session,
+  command = paste(
+    "sbatch",
+    "--array=1-7",
+    "--cpus-per-task=4",
+    "--mem=8G",
+    "--time=9:00:00",
+    "--job-name=biomass",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--wrap",
+    shQuote(
+      paste0(
+        "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R biomass ",
+        M
+      )
+    )
+  )
+)
+
+# density Model runs
+ssh_exec_wait(
+  session,
+  command = paste(
+    "sbatch",
+    "--array=1-7",
+    "--cpus-per-task=4",
+    "--mem=16G",
+    "--time=9:00:00",
+    "--job-name=sample_den",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--wrap",
+    shQuote(
+      paste0(
+        "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R sample_den ",
+        M
+      )
+    )
+  )
+)
+
+# PtoB Model runs
+ssh_exec_wait(
+  session,
+  command = paste(
+    "sbatch",
+    "--array=1-7",
+    "--cpus-per-task=4",
+    "--mem=8G",
+    "--time=0:10:00",
+    "--job-name=ptob",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--wrap",
+    shQuote(
+      paste0(
+        "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R ptob"
       )
     )
   )
