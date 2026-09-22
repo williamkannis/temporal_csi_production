@@ -451,7 +451,11 @@ lapply(1:nrow(upr_preds),function(i){
   plot_height <- 10
   if(u_p != "int") plot_height <- plot_height*1.25
   ggsave(
-    file.path(plot_dir,plot_name),
+    file.path(
+      plot_dir,
+      "coef_tree",
+      plot_name
+      ),
     plot = plot,
     bg = "transparent",
     width = 5,
