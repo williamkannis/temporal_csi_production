@@ -27,12 +27,6 @@ plot_dir <- "figures"
 # Data
 prod_df <- 
   readRDS(file.path(prod_dir,"fsprod_formatted.rds"))
-# phy_site <- 
-#   readRDS(file.path(prod_dir,"phys_site_predictors_2026-07-13.rds"))
-# phy_year <- 
-#   readRDS(file.path(prod_dir,"phys_year_predictors_2026-07-13.rds"))
-# phy_reg_year <- 
-#   readRDS(file.path(prod_dir,"phys_regionyear_predictors_2026-07-14.rds"))
 len_df <-
   readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
 
