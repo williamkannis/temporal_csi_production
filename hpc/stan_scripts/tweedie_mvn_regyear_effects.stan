@@ -12,13 +12,13 @@ data {
   array[S] int<lower=1, upper=R> rg;  // region-site bridge
   array[N] real y;                    // outcome array
   array[N] row_vector[K] x;           // period-level predictor data
-  array[R] matrix[T, L] z;              // year-level predictor data, by region
+  array[R] matrix[T, L] z;            // year-level predictor data, by region
 }
 
 parameters {
   matrix[L,K] gamma;                  // year-level effect coefficents
   array[R] matrix[K,T] beta_raw;      // standardized year-level deviations
-  vector[S] st_raw;                 // standardized site effect deviations
+  vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
   vector<lower=0>[K] tau;             // year-level effect coefficents error
   real<lower=0> tau_s;                // site random effect error
@@ -136,48 +136,54 @@ model {
 
 generated quantities {
 
-  // vector[N] log_lik;
+  vector[N] log_lik;
   vector[N] y_rep;
-  array[N] real residuals;
+  vector[N] p_zero;
+  array[N] real raw_residuals;
+  array[N] real pearson_residual;
 
   for (n in 1:N) {
 
-    // // Log likelihood
-    // if (y[n] == 0) {
-    //
-    //   log_lik[n] = -lambda[n];
-    //
-    // } else {
-    //
-    //   vector[M] lp;
-    //
-    //   real common;
-    //   real log_term;
-    //
-    //   common =
-    //       -lambda[n]
-    //       - beta_gamma[n] * y[n]
-    //       - log(y[n]);
-    //
-    //   log_term =
-    //       log(lambda[n])
-    //       + alpha * log(beta_gamma[n])
-    //       + alpha * log(y[n]);
-    //
-    //   for (m in 1:M) {
-    //
-    //     lp[m] =
-    //         common
-    //         + m * log_term
-    //         - lgamma(m * alpha)
-    //         - lgamma(m + 1);
-    //   }
-    //
-    //   log_lik[n] = log_sum_exp(lp);
-    // }
+    // Log likelihood
+    if (y[n] == 0) {
+
+      log_lik[n] = -lambda[n];
+
+    } else {
+
+      vector[M] lp;
+
+      real common;
+      real log_term;
+
+      common =
+          -lambda[n]
+          - beta_gamma[n] * y[n]
+          - log(y[n]);
+
+      log_term =
+          log(lambda[n])
+          + alpha * log(beta_gamma[n])
+          + alpha * log(y[n]);
+
+      for (m in 1:M) {
+
+        lp[m] =
+            common
+            + m * log_term
+            - lgamma(m * alpha)
+            - lgamma(m + 1);
+      }
+
+      log_lik[n] = log_sum_exp(lp);
+    }
 
     // residuals
-    residuals[n] = y[n]-mu[n];
+    raw_residuals[n] = y[n]-mu[n];
+    pearson_residual[n] = raw_residuals[n] / sqrt(phi * pow(mu[n], theta));
+
+    // probability of zero
+    p_zero[n] = exp(-lambda[n]);
 
     // Posterior predictive draw
     {
@@ -200,10 +206,3 @@ generated quantities {
     }
   }
 }
-// generated quantities {
-//   real max_lambda;
-//   real max_eta;
-// 
-//   max_lambda = max(lambda);
-//   max_eta = max(eta);
-// }
