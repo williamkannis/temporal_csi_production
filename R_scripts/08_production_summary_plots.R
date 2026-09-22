@@ -21,199 +21,105 @@ library(tidyr)
 
 # Directories
 prod_dir <- "prod_data"
-input_dir <- "input_data"
+# input_dir <- "input_data"
 plot_dir <- "figures"
-
 
 # Data
 prod_df <- 
-  readRDS(file.path(prod_dir,"fsprod_igr_2026-07-13.rds"))
-phy_site <- 
-  readRDS(file.path(prod_dir,"phys_site_predictors_2026-07-13.rds"))
-phy_year <- 
-  readRDS(file.path(prod_dir,"phys_year_predictors_2026-07-13.rds"))
-phy_reg_year <- 
-  readRDS(file.path(prod_dir,"phys_regionyear_predictors_2026-07-14.rds"))
-len_df <- 
-  readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
+  readRDS(file.path(prod_dir,"fsprod_formatted.rds"))
+# phy_site <- 
+#   readRDS(file.path(prod_dir,"phys_site_predictors_2026-07-13.rds"))
+# phy_year <- 
+#   readRDS(file.path(prod_dir,"phys_year_predictors_2026-07-13.rds"))
+# phy_reg_year <- 
+#   readRDS(file.path(prod_dir,"phys_regionyear_predictors_2026-07-14.rds"))
+# len_df <- 
+#   readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
 
-# Prep data  -------------------------------------------------------------------
+# General plot details  --------------------------------------------------------
+sp_colors <- 
+  c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c")
 
-# Remove NA production estimates
-prod_for <- prod_df %>% filter(!is.na(production_mean))
+response <- c("sample_den","biomass_mean","production_mean","ptob")
 
-# Create a composite production measure using all species
-prod_all <- prod_for %>% 
-  group_by(site,cum,date,area,interval) %>% 
-  summarise(
-    across(contains("sample_den"),sum),
-    across(contains("biomass"),sum),
-    across(contains("production"),sum)
-  ) %>% 
-  mutate(
-    species = "all",
-    PtoB_mean = production_mean/biomass_mean
-    ) %>% 
-  bind_rows(prod_for)
+# Response boxplots  -----------------------------------------------------------
 
-
-# Add sample info to production data
-samp_df <- phy_site %>% 
-  distinct(wateryear,region,site,cum) %>% 
-  filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
-  left_join(prod_all, by = join_by(site,cum)) %>% 
-  filter(!is.na(production_mean)) %>% 
+bar_list <- lapply(response, function(r){
+  plot_df <-prod_df
+  plot_df$y <- plot_df[[r]]
+  plot <- ggplot(
+    data = plot_df,
+    aes(
+      x = species,
+      y= y,
+      color = species,
+      fill = species
+    ))+
+    geom_boxplot(fatten = NULL)+
+    stat_summary(
+      fun = median, 
+      geom = "crossbar", 
+      fun.min = median, 
+      fun.max = median, 
+      width = 0.75,       
+      color = "white",      
+      fatten = 1          
+    )+
+    theme_classic()+
+    theme(
+      axis.text.x  = element_blank(),
+      axis.text.y = element_text(size = 18),
+      legend.position = "none",
+      panel.border =  element_rect(
+        color = "black", 
+        fill = NA, 
+        size = 1
+        )
+    )+
+    scale_fill_manual(values = sp_colors)+
+    scale_color_manual(values = sp_colors)+
+    xlab("")+
+    ylab("")
+  print(plot)
+  plot
   
-  # add watr period
-  left_join(
-    len_df %>% distinct(cum,waterperiod),
-    by = join_by(cum)
-    )
-
-
-# Total summary boxplots  ------------------------------------------------------
-
-tot_bio <- ggplot(
-  data = samp_df %>% filter(species == "all"),
-  aes(
-    x = species,
-    y= biomass_mean,
-  ))+
-  geom_boxplot(fatten = NULL,fill="black")+
-  stat_summary(
-    fun = median, 
-    geom = "crossbar", 
-    fun.min = median, 
-    fun.max = median, 
-    width = 0.75,       
-    color = "white",      
-    fatten = 2          
-  )+
-  theme_classic()+
-  theme(
-    axis.text.x = element_text(size = 18),  
-    axis.text.y = element_text(size = 18),
-    legend.position = "none",
-    panel.border =  element_rect(color = "black", fill = NA, size = 1)
-  )+
-  xlab("")+
-  ylab("")
-tot_bio_name <- paste0("prod_plots/tot_bio.png")
-ggsave(
-  file.path(plot_dir,tot_bio_name),
-  plot = tot_bio,
-  width = 4.6,
-  height = 8,
-  dpi = 300
-)
-
-tot_prod <- ggplot(
-  data = samp_df %>% filter(species == "all"),
-  aes(
-    x = species,
-    y= production_mean,
-  ))+
-  geom_boxplot(fatten = NULL,fill="black")+
-  stat_summary(
-    fun = median, 
-    geom = "crossbar", 
-    fun.min = median, 
-    fun.max = median, 
-    width = 0.75,       
-    color = "white",      
-    fatten = 2          
-  )+
-  theme_classic()+
-  theme(
-    axis.text.x = element_text(size = 18),  
-    axis.text.y = element_text(size = 18),
-    legend.position = "none",
-    panel.border =  element_rect(color = "black", fill = NA, size = 1)
-  )+
-  xlab("")+
-  ylab("")
-tot_prod_name <- paste0("prod_plots/tot_prod.png")
-ggsave(
-  file.path(plot_dir,tot_prod_name),
-  plot = tot_prod,
-  width = 4.6,
-  height = 8,
-  dpi = 300
-)
-
-tot_bio <- ggplot(
-  data = samp_df %>% filter(species == "all"),
-  aes(
-    x = species,
-    y= biomass_mean,
-  ))+
-  geom_boxplot(fatten = NULL,fill="black")+
-  stat_summary(
-    fun = median, 
-    geom = "crossbar", 
-    fun.min = median, 
-    fun.max = median, 
-    width = 0.75,       
-    color = "white",      
-    fatten = 2          
-  )+
-  theme_classic()+
-  theme(
-    axis.text.x = element_text(size = 18),  
-    axis.text.y = element_text(size = 18),
-    legend.position = "none",
-    panel.border =  element_rect(color = "black", fill = NA, size = 1)
-  )+
-  xlab("")+
-  ylab("")
-tot_bio_name <- paste0("prod_plots/tot_bio.png")
-ggsave(
-  file.path(plot_dir,tot_bio_name),
-  plot = tot_bio,
-  width = 4.6,
-  height = 8,
-  dpi = 300
-)
-
-tot_p2b <- ggplot(
-  data = samp_df %>% filter(species == "all"),
-  aes(
-    x = species,
-    y= PtoB_mean,
-  ))+
-  geom_boxplot(fatten = NULL,fill="black")+
-  stat_summary(
-    fun = median, 
-    geom = "crossbar", 
-    fun.min = median, 
-    fun.max = median, 
-    width = 0.75,       
-    color = "white",      
-    fatten = 2          
-  )+
-  theme_classic()+
-  theme(
-    axis.text.x = element_text(size = 18),  
-    axis.text.y = element_text(size = 18),
-    legend.position = "none",
-    panel.border =  element_rect(color = "black", fill = NA, size = 1)
-  )+
-  xlab("")+
-  ylab("")
-tot_p2b_name <- paste0("prod_plots/tot_p2b.png")
-ggsave(
-  file.path(plot_dir,tot_p2b_name),
-  plot = tot_p2b,
-  width = 4.6,
-  height = 8,
-  dpi = 300
+  # plot_name <- paste0(r,"_barplot.png")
+  # ggsave(
+  #   file.path(
+  #     plot_dir,
+  #     "response_barplot",
+  #     plot_name
+  #     ),
+  #   plot = plot,
+  #   width = 8,
+  #   height = 3,
+  #   dpi = 300
+  # )
+}
 )
 
 
+barplot <- cowplot::plot_grid(
+  plotlist = bar_list,
+  ncol = 1,
+  align = "v"
+)
+
+ggsave(
+  file.path(
+    plot_dir,
+    "response_barplot",
+    "response_barplot.png"
+  ),
+  plot = barplot,
+  width = 8,
+  height = 12,
+  dpi = 300
+)
 
 
 # Species composition ----------------------------------------------------------
-sp_df <-samp_df %>% 
+sp_df <-prod_df %>% 
   select(wateryear,cum,region,site,species,production_mean) %>% 
   pivot_wider(
     names_from = species,
@@ -290,7 +196,7 @@ ggsave(
 
 
 # Species comparison  ----------------------------------------------------------
-sp_prod <- samp_df %>% 
+sp_prod <- prod_df %>% 
   
   # Aggergate to sampling interval
   summarise(
@@ -370,7 +276,7 @@ ggsave(
 
 season_phy <- 
   phy_site %>% 
-  left_join(samp_df %>% distinct(cum,waterperiod)) %>% 
+  left_join(prod_df %>% distinct(cum,waterperiod)) %>% 
   summarise(
     depth = mean(depth,na.rm=T),
     plt_cov_int = mean(plt_cov_int,na.rm=T),
@@ -435,7 +341,7 @@ ggsave(
 
 # Total region:year  -----------------------------------------------------------
 
-year_prod <- samp_df %>% 
+year_prod <- prod_df %>% 
   # filter(species == "all") %>% 
   
   # Change daily production to interval production
