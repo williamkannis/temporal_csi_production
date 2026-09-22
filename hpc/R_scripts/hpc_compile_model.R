@@ -29,6 +29,11 @@ message("[", Sys.time(), "] Compiling/loading Stan model: ",mod_name,"...")
 mod <- cmdstan_model(file.path(mod_dir,mod_name))
 message("[", Sys.time(), "] Stan model ready")
 
+mod_name <- "hurdle_mvn_regyear_effects.stan"
+message("[", Sys.time(), "] Compiling/loading Stan model: ",mod_name,"...")
+mod <- cmdstan_model(file.path(mod_dir,mod_name))
+message("[", Sys.time(), "] Stan model ready")
+
 # End script  ------------------------------------------------------------------
 
 message("============================================================")
