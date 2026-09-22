@@ -44,22 +44,76 @@ seasonal_prod <- prod_df %>%
         sample_den,
         biomass_mean,biomass_lwr,biomass_upr,
         production_mean,production_lwr,production_upr,
-        ptob),
+        ptob
+        ),
       .fns = mean
     ),
     .by = c(wateryear,waterperiod,cum,species)
   )
 
-# Annual response variables
-year_prod <- prod_df %>% 
+# # Annual response variables
+# year_prod <- prod_df %>% 
+# 
+#   # Change daily production to interval production
+#   mutate(
+#     across(
+#       .cols = c(
+#         production_mean,production_lwr,production_upr,
+#         ptob
+#         ),
+#       .fns = \(x) x*interval
+#     )
+#   ) %>% 
+#   
+#   # Aggreage production estiate to annual scale
+#   summarise(
+#     across(
+#       .cols = c(
+#         production_mean,production_lwr,production_upr,
+#         ptob,interval
+#         ),
+#       .fns = sum
+#     ),
+#     across(
+#       .cols = c(
+#         sample_den,
+#         biomass_mean,biomass_lwr,biomass_upr
+#       ),
+#       .fns = mean
+#     ),
+#     .by = c(wateryear,region,site,species)
+#   ) %>% 
+#   
+#   # Standardized values to 365 (not all annual intervals are the same)
+#   mutate(
+#     across(
+#       .cols = c(production_mean,production_lwr,production_upr,ptob),
+#       .fns = \(x) x*(365/interval)
+#     )
+#   ) %>% 
+# 
+#   # SUmmarized across all sites
+#   summarize(
+#     across(
+#       .cols = c(
+#         sample_den,
+#         biomass_mean,biomass_lwr,biomass_upr,
+#         production_mean,production_lwr,production_upr,
+#         ptob),
+#       .fns = mean
+#     ),
+#     .by = c(wateryear,species)
+#   )
 
+
+year_prod <- prod_df %>% 
+  
   # Change daily production to interval production
   mutate(
     across(
       .cols = c(
-        production_mean,production_lwr,production_upr,
-        ptob
-        ),
+        production_mean,production_lwr,production_upr
+      ),
       .fns = \(x) x*interval
     )
   ) %>% 
@@ -68,17 +122,17 @@ year_prod <- prod_df %>%
   summarise(
     across(
       .cols = c(
-        production_mean,production_lwr,production_upr,
-        ptob,interval
-        ),
+        production_mean,production_lwr,production_upr,interval
+      ),
       .fns = sum
     ),
     across(
       .cols = c(
         sample_den,
+        interval_biomass_mean,
         biomass_mean,biomass_lwr,biomass_upr
       ),
-      .fns = sum
+      .fns = mean
     ),
     .by = c(wateryear,region,site,species)
   ) %>% 
@@ -86,11 +140,12 @@ year_prod <- prod_df %>%
   # Standardized values to 365 (not all annual intervals are the same)
   mutate(
     across(
-      .cols = c(production_mean,production_lwr,production_upr,ptob),
+      .cols = c(production_mean,production_lwr,production_upr),
       .fns = \(x) x*(365/interval)
-    )
+    ),
+    ptob = production_mean/interval_biomass_mean
   ) %>% 
-
+  
   # SUmmarized across all sites
   summarize(
     across(
@@ -99,7 +154,7 @@ year_prod <- prod_df %>%
         biomass_mean,biomass_lwr,biomass_upr,
         production_mean,production_lwr,production_upr,
         ptob),
-      .fns = mean
+      .fns = mean, na.rm=T
     ),
     .by = c(wateryear,species)
   )
@@ -117,7 +172,11 @@ response <- c("sample_den","biomass_mean","production_mean","ptob")
 # Response boxplots  -----------------------------------------------------------
 
 bar_list <- lapply(response, function(r){
-  plot_df <-prod_df
+  plot_df <-prod_df %>% 
+    mutate(ptob = case_when(
+      ptob == 0 ~ NA,
+      T~ptob
+    ))
   plot_df$y <- plot_df[[r]]
   plot <- ggplot(
     data = plot_df,
