@@ -33,7 +33,7 @@ len_df <-
 
 # Data preparation  ------------------------------------------------------------
 
-# seasonal response varibales
+# seasonal response variables
 seasonal_prod <- prod_df %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
   
@@ -103,7 +103,6 @@ year_prod <- prod_df %>%
     ),
     .by = c(wateryear,species)
   )
-
 
 
 # General plot details  --------------------------------------------------------
@@ -343,3 +342,108 @@ ggsave(
   dpi = 300
 )
 
+
+# Species seasonal plot  -------------------------------------------------------
+
+avg_seasonal_prod <- prod_df %>% 
+  left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
+  
+  # Aggergate to sampling interval
+  summarise(
+    across(
+      .cols = c(
+        sample_den,
+        biomass_mean,biomass_lwr,biomass_upr,
+        production_mean,production_lwr,production_upr,
+        ptob),
+      .fns = mean
+    ),
+    .by = c(waterperiod,species)
+  )
+
+sp_season_list <- lapply(response[response != "ptob"], function(r){
+  plot_df <-avg_seasonal_prod
+  plot_df$y <- plot_df[[r]]
+  
+  theme(legend.position = "none") 
+  
+  plot<-ggplot(
+    data = plot_df%>% filter(species != "all"),
+    aes(
+      x = waterperiod,
+      y = y,
+      fill = species
+    )
+  ) +
+    geom_col(
+      position = "stack",
+      width = 0.8
+    )+
+    scale_fill_manual(
+      values = sp_colors[sp!="all"]
+    ) +
+    geom_line(
+      data = plot_df %>% filter(species == "all"),
+      aes(
+        x = waterperiod,
+        y = y
+      ),
+      inherit.aes = F,
+      color = "black",
+      linewidth = 1
+    )+
+    theme_classic()+
+    theme(
+      axis.text.x = element_blank(),    
+      axis.text.y = element_text(size = 18),
+      legend.position = "none",
+      panel.border =  element_rect(color = "black", fill = NA, size = 1)
+    )+
+    xlab("")+
+    ylab("")
+  print(plot)
+  plot
+})
+names(sp_season_list) <- response[response != "ptob"]
+
+sp_season_list$ptob <- ggplot(
+  data = avg_seasonal_prod ,
+  aes(
+    x = waterperiod,
+    y=ptob, 
+    group = species,
+    fill = species
+  )
+)+
+  geom_line(aes(color = species),linewidth = 1.5)+
+  scale_color_manual(values = sp_colors)+
+  theme_classic()+
+  theme(
+    axis.text.x = element_blank(),  
+    axis.text.y = element_text(size = 18),
+    legend.position = "none",
+    panel.border =  element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "transparent", colour = NA), 
+    plot.background = element_rect(fill = "transparent", colour = NA)
+  )+
+  
+  xlab("")+
+  ylab("")
+
+sp_season_plot <- cowplot::plot_grid(
+  plotlist = sp_season_list,
+  ncol = 1,
+  align = "v"
+)
+
+ggsave(
+  file.path(
+    plot_dir,
+    "response_trend",
+    "sp_season_response.png"
+  ),
+  plot = sp_season_plot,
+  width = 8,
+  height = 12,
+  dpi = 300
+)
