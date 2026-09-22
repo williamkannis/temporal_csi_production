@@ -56,13 +56,14 @@ prod_all <- prod_for %>%
   )
 
 # Add sample info to production data
-samp_df <- phy_site %>% 
+prod_final <- phy_site %>% 
   distinct(wateryear,region,site,cum) %>% 
   filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
   # filter(wateryear !=1995) %>%  ## TEMP ASK JOEL FOR LAG DATA FOR THIS YEAR
   left_join(prod_all, by = join_by(site,cum)) %>% 
-  filter(!is.na(production_mean)) %>% 
+  filter(!is.na(production_mean)) 
   
+samp_df <- prod_final %>% 
   # transform response varibales to improv convergence
   mutate(
     production_mean = production_mean*1000,
@@ -179,6 +180,9 @@ input_list <- lapply(1:n_cb, function(i){
 
 
 # Export  ----------------------------------------------------------------------
+
+# Formatted and filtered production data
+saveRDS(prod_final,file.path(input_dir, "fsprod_formatted.rds"))
 
 # Prepare list for exporting
 names(input_list) <- apply(cb, 1, paste, collapse = "_")
