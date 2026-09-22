@@ -59,7 +59,7 @@ prod_all <- prod_for %>%
 samp_df <- phy_site %>% 
   distinct(wateryear,region,site,cum) %>% 
   filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
-  filter(wateryear !=1995) %>%  ## TEMP ASK JOEL FOR LAG DATA FOR THIS YEAR
+  # filter(wateryear !=1995) %>%  ## TEMP ASK JOEL FOR LAG DATA FOR THIS YEAR
   left_join(prod_all, by = join_by(site,cum)) %>% 
   filter(!is.na(production_mean)) %>% 
   
@@ -73,8 +73,9 @@ samp_df <- phy_site %>%
 # Number of species response combinations
 cb <- expand.grid(
   unique(samp_df$species),
-  # c("production_mean","biomass_mean","ptob")
-  c("production_mean","biomass_mean")
+  c("production_mean","biomass_mean","ptob","sample_den")
+  # c("production_mean","biomass_mean")
+  # c("ptob")
 )
 n_cb <- nrow(cb)
 
@@ -160,12 +161,14 @@ input_list <- lapply(1:n_cb, function(i){
     S = n_distinct(site_df$site_id),
     R = n_distinct(site_df$reg_id),
     K = ncol(x_df),
+    H = ncol(x_df),
     L = ncol(z_data[1,,]),
     y = site_df$y,
     yr = site_df$year_id,
     st = site_df$site_id,
     rg = reg_bridge,
     x = x_df,
+    x_hurdle = x_df,
     z = z_data
   )
   
@@ -201,3 +204,4 @@ zbridge_list <-input_list_t$zbridge
 saveRDS(xbridge_list, file.path())
 saveRDS(zbridge_list, file.path())
 
+hist(stan_list$JORFLO_sample_den$y,breaks=40)
