@@ -127,7 +127,7 @@ beta_list <- lapply(mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
-  respones <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
   # Extract model coefficients
   out <- out_list[[m]]
@@ -181,14 +181,15 @@ z_list <- lapply(mods, function(m){
 names(z_list) <- names(out_list)
 
 
-# Gamma plots  -----------------------------------------------------------------
+
+# Predicted slopes  ------------------------------------------------------------
 pred_len <- 100
 n_iter <- 1000
-gamma_plots <- lapply(mods, function(m){
+predicted_slopes <- lapply(mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
-  respones <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
   # Extract model coefficients
   out <- out_list[[m]]
@@ -200,7 +201,7 @@ gamma_plots <- lapply(mods, function(m){
     distinct(z_var,x_var) %>% 
     filter(z_var != "int")
   
-  pred_list <- lapply(1:nrow(var_combo), function(v) {
+  lapply(1:nrow(var_combo), function(v) {
     vars <- var_combo[v,]
     predictor <- vars$z_var
     z_data <- z_list[[m]]
@@ -208,7 +209,7 @@ gamma_plots <- lapply(mods, function(m){
       0,
       nrow = pred_len,
       ncol = ncol(z_data %>% select(-region,-wateryear))
-      )
+    )
     colnames(z_mat) <- colnames(z_data %>% select(-region,-wateryear))
     
     z <- z_data[,predictor]
@@ -227,21 +228,58 @@ gamma_plots <- lapply(mods, function(m){
         left_join(
           gamma_bridge[[m]],
           by = join_by(variable)
-          ) %>% 
+        ) %>% 
         filter(x_var == vars$x_var) %>% 
-        # inner_join(
-        #   vars,
-        #   by = join_by(z_var,x_var)) %>% 
         pull(coef)
       pred <- z_mat %*% gamma
       pred_vec <- cbind(pred_vec,pred)
     }
     pred_df <- data.frame(
+      response = response,
+      species = sp,
+      x_var = vars$x_var,
+      z_var = predictor,
+      z_range=z_mat[,predictor],
       pred_md = apply(pred_vec, 1, quantile, probs=0.5),
       pred_up = apply(pred_vec, 1, quantile, probs=0.975),
-      pred_lo = apply(pred_vec, 1, quantile, probs=0.025),
-      z_range=z_mat[,predictor]
+      pred_lo = apply(pred_vec, 1, quantile, probs=0.025)
+      
     )
+  }
+  ) #%>% 
+  #bind_rows()
+}) %>% 
+  bind_rows()
+
+
+# Gamma plots  -----------------------------------------------------------------  
+gamma_plots <- lapply(mods,function(m){ 
+  
+  # Load in parametes and data
+  z_data <- z_list[[m]]
+  beta <- beta_list[[m]]
+  sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
+  res <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  
+  var_combo <- predicted_slopes %>% 
+    distinct(z_var,x_var) %>% 
+    filter(z_var != "int")
+  
+  # Create plot for each predictor combo
+  plot_list <- lapply(1:nrow(var_combo), function(v) {
+    
+    
+    ### Filter predicted slopes based on desired plot  ###
+    vars <- var_combo[v,]
+    predictor <- vars$z_var
+    pred_df <- predicted_slopes %>% 
+      filter(
+        species == sp,
+        response == res,
+        x_var == vars$x_var,
+        z_var == vars$z_var
+      )
+    
     
     ### Create data frame with actual slope values  ###
     
@@ -250,16 +288,14 @@ gamma_plots <- lapply(mods, function(m){
     z_df[,"z"] <- z_data[[predictor]]
     
     # Merge predictor data into slope data
-    slope_df <- beta_list[[m]] %>% 
+    slope_df <- beta %>% 
       filter(x_var == vars$x_var) %>% 
       left_join(
         z_df,
         by = join_by(region, wateryear)
       ) 
     
-    # list(pred_df = pred_df, slope_df = slope_df)
-    
-    # Create plots
+    #### Create plots  ###
     g_plot <- ggplot(
       data=pred_df,
       aes(x = z_range,y = pred_md)
@@ -299,14 +335,11 @@ gamma_plots <- lapply(mods, function(m){
     
     
   })
-  names(pred_list) <- paste(var_combo$z_var,var_combo$x_var,sep = "_")
-  pred_list
-  
-
+  names(plot_list) <- paste(var_combo$z_var,var_combo$x_var,sep = "_")
+  plot_list
   
 }
 )
-names(gamma_plots) <- names(out_list)
 
 species = "LUCGOO";response = "production_mean";z="pisc_index"; x ="plt_cov_int"
 
@@ -332,7 +365,7 @@ coef_df <- lapply(mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
-  respones <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
   
   # Extract var names
@@ -360,7 +393,7 @@ coef_df <- lapply(mods, function(m){
     ) %>% 
     mutate(
       species = sp,
-      response = respones,
+      response = response,
       overlap0 = case_when(
         lwr*upr >0 ~ F,
         T ~ T
@@ -473,7 +506,7 @@ hurdle_coef_df <- lapply(h_mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
-  respones <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
   
   # Extract var names
@@ -501,7 +534,7 @@ hurdle_coef_df <- lapply(h_mods, function(m){
     ) %>% 
     mutate(
       species = sp,
-      response = respones,
+      response = response,
       overlap0 = case_when(
         lwr*upr >0 ~ F,
         T ~ T
@@ -598,7 +631,7 @@ preds <- lapply(mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
-  respones <- stringr::str_split_fixed(m, "_", n = 2)[2]
+  response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
   # Extract model coefficients
   out <- out_list[[m]]
@@ -655,7 +688,7 @@ preds <- lapply(mods, function(m){
     
     pred_df$sp <- sp
     pred_df$predictor <- predictor
-    pred_df$respone <- respones
+    pred_df$response <- response
     pred_df
     
   })
@@ -670,7 +703,7 @@ lapply(unique(preds$predictor), function(p){
   plot_df <- preds %>% 
     filter(
       predictor == p,
-      respone == r) 
+      response == r) 
   
   plot <- ggplot(
     plot_df,
@@ -690,3 +723,6 @@ lapply(unique(preds$predictor), function(p){
     xlab(p)+
     ylab(r);print(plot)
 })
+
+
+# CSI Plots  --------------------------
