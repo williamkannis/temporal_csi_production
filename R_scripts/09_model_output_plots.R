@@ -725,4 +725,786 @@ lapply(unique(preds$predictor), function(p){
 })
 
 
-# CSI Plots  --------------------------
+
+
+# CSI Plots (v4)  --------------------------------------------------------------
+
+# USE THIS ONE. Includes annual effects
+
+# Find only significant CSI's
+sig_df <- coef_df %>% 
+  filter(
+    z_var != "int",
+    x_var != "int",
+    !overlap0
+  ) %>% 
+  mutate(sig = T) %>% 
+  distinct(
+    species,
+    response,
+    x_var,
+    z_var,
+    sig
+  )
+
+# Population level coefficients, use when no sig CSI
+pop_coef <- coef_df %>% 
+  filter(
+    z_var == "int",
+    x_var != "int"
+  ) %>% 
+  rename(
+    overlap0_all = overlap0
+  ) %>% 
+  select(
+    species,
+    response,
+    x_var,
+    z_var,
+    mean,
+    lwr,
+    upr,
+    overlap0_all
+  ) %>% 
+  anti_join(sig_df %>% distinct(species,response,x_var))
+
+# Extract and format annual drivers
+yr_vars <-coef_df %>% 
+  filter(
+    z_var != "int",
+    x_var == "int"
+  ) %>% 
+  mutate(
+    x_var = z_var,
+    z_var = "int"
+  ) %>% 
+  rename(
+    overlap0_all = overlap0
+  ) %>% 
+  select(
+    species,
+    response,
+    x_var,
+    z_var,
+    mean,
+    lwr,
+    upr,
+    overlap0_all
+  )
+
+# Extract season slopes at min and max value of annual predictors
+minmax_slopes <-predicted_slopes %>% 
+  group_by(
+    response,
+    species,
+    x_var,
+    z_var
+  ) %>% 
+  mutate(
+    z_range = case_when(
+      z_range == min(z_range) ~ "min",
+      z_range == max(z_range) ~ "max"
+    ),
+    overlap0 = case_when(
+      pred_up*pred_lo > 0 ~ F,
+      T ~T
+    )
+  ) %>% 
+  ungroup() %>% 
+  filter(
+    !is.na(z_range),
+    x_var != "int"
+  ) %>% 
+  select(-pred_up,-pred_lo) %>% 
+  pivot_wider(
+    names_from = z_range,
+    values_from = c(pred_md,overlap0)
+  ) %>% 
+  mutate(
+    overlap0_all =case_when(
+      overlap0_min & overlap0_max ~ T,
+      T~F
+    )) %>% 
+  
+  # Remove nonsignficant CSI's and ...
+  right_join(
+    sig_df,
+    by = join_by(response,species, x_var, z_var)
+  ) %>% 
+  # mutate(
+  #   pred_md_min = case_when(sig ~ pred_md_min),
+  #   pred_md_max = case_when(sig ~ pred_md_max),
+  #   overlap0_min = case_when(sig ~ overlap0_min),
+  #   overlap0_max = case_when(sig ~ overlap0_max),
+  #   overlap0_all = case_when(sig ~ overlap0_all)
+  # ) %>% 
+  
+  # replace with global coef
+  bind_rows(pop_coef) %>% 
+  
+  # Add in annual coef
+  bind_rows(yr_vars)
+
+# Plotting parameters
+sp_colors <- 
+  c("all" = "black",
+    "FUNCHR" = "#b5a331",
+    "GAMHOL" = "#339d38",
+    "HETFOR" = "#c26a77",
+    "JORFLO" = "#8c6d3f",
+    "LUCGOO" = "#2f2585",
+    "POELAT" = "#2b695c"
+  )
+pd <- position_dodge(width = .8)
+responses <- c("sample_den","biomass_mean","production_mean","ptob")
+
+# Create plot for each response
+lapply(responses, function(r) {
+  
+  # Prepare data for plots
+  plot_df <- minmax_slopes %>% 
+    filter(response == r) %>% 
+    mutate(
+      x_var = factor(
+        x_var,
+        levels= rev(
+          c(
+            "depth",
+            "dsldd_int",
+            "plt_cov_int",
+            "peri_vol_int",
+            "wet_sum_365day",
+            "pisc_index"
+          )
+          )
+      ),
+      species = forcats::fct_rev(species),
+      z_var = factor(
+        z_var,
+        levels = rev(c("int","wet_sum_365day", "pisc_index"))
+      ),
+      dodge_group = interaction(
+        species,
+        z_var,
+        sep = "_",
+        lex.order = TRUE
+      )
+    )
+  
+ # Create plot 
+  plot <- ggplot(
+    data=plot_df, 
+    aes(
+      y=x_var,
+      x=pred_md_max,
+      color = species,
+      alpha = overlap0_all,
+      group = dodge_group,
+      linewidth = species,
+      size = species
+    )
+  ) +
+    geom_vline(xintercept = 0, color = "red",linewidth =2) + 
+    
+    # global 95CI
+    geom_errorbarh(
+      aes(
+        xmin = pred_md_min, 
+        xmax = pred_md_max,
+        linetype = z_var
+      ),
+      height =0,
+      position = pd,
+      # linewidth = 2,
+    )+
+    
+    # CSI coef range
+    geom_errorbarh(
+      aes(
+        xmin = upr, 
+        xmax = lwr,
+      ),
+      height =0,
+      position = pd,
+      # linewidth = 2,
+    )+
+    
+    # Global coef mean
+    geom_point(
+      aes(
+        y=x_var,
+        x=mean,
+        color = species
+      ),
+      position = pd,
+      # size = 5
+    )+ 
+    
+    # Effect at max annual predictors
+    geom_point(
+      aes(
+        y=x_var,
+        x=pred_md_max,
+        color = species,
+        alpha = overlap0_max
+        ),
+      position = pd,
+      # size = 5,
+      shape = 17)+ 
+    
+    # Effect at min annual predictors
+    geom_point(
+      aes(
+        y=x_var,
+        x=pred_md_min,
+        color = species,
+        alpha = overlap0_min
+      ),
+      position = pd,
+      # size = 5,
+      shape = 15
+    )+ 
+    
+    # Set custom plotting parameters
+    scale_alpha_manual(
+      values = c(`TRUE` = 0.3, `FALSE` = 1),
+      guide = "none"
+    ) +
+    scale_linetype_manual(
+      values = c("41","11","solid")
+      )+
+    scale_linewidth_manual(
+      values = rev(c(3,rep(2,6)))
+      )+
+    scale_size_manual(
+      values = rev(c(8,rep(5,6)))
+      )+
+    scale_color_manual(values =sp_colors)+
+    
+    # Theme and display settings
+    xlab("")+
+    theme(legend.position="none")+
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      plot.border  = element_blank(),
+      axis.line.x = element_line(color = "black", linewidth = 2),
+      panel.background = element_rect(fill = "transparent", color = NA),
+      plot.background  = element_rect(fill = "transparent", color = NA),
+      axis.text.x = element_text(size = 24)
+    )#+
+  #labs(title = r);print(plot)
+  
+  # Export plot
+  plot_name <- paste0("coef_csi_plot_",r,"_v4.png")
+  plot_height <- 13*1.5
+  ggsave(
+    file.path(
+      plot_dir,
+      "csi_coef",
+      plot_name
+    ),
+    plot = plot,
+    bg = "transparent",
+    width = 5,
+    height = plot_height,
+    dpi = 300
+  )
+})
+
+
+# # CSI Plots (v1)  --------------------------
+# 
+# minmax_slopes <-predicted_slopes %>% 
+#   group_by(
+#     response,
+#     species,
+#     x_var,
+#     z_var
+#     ) %>% 
+#   mutate(
+#     z_range = case_when(
+#       z_range == min(z_range) ~ "min",
+#       z_range == max(z_range) ~ "max"
+#     ),
+#     overlap0 = case_when(
+#       pred_up*pred_lo > 0 ~ F,
+#       T ~T
+#     )
+#   ) %>% 
+#   ungroup() %>% 
+#   filter(
+#     !is.na(z_range),
+#     x_var != "int"
+#     )
+# 
+# sp_colors <- 
+#   rev(c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c"))
+# pd <- position_dodge(width = 0.5)
+# 
+# responses <- c("sample_den","biomass_mean","production_mean","ptob")
+# lapply(responses, function(r) {
+#   plot_df <- minmax_slopes %>% 
+#     filter(response == r, z_var == "wet_sum_365day")
+#   
+#   plot <- ggplot(
+#     data=plot_df, 
+#     aes(
+#       y=x_var,
+#       x=pred_md,
+#       color = species,
+#       alpha = overlap0,
+#       shape = factor(z_range))
+#   ) +
+#     geom_vline(xintercept = 0, color = "red",linewidth =2) + 
+#     geom_errorbarh(
+#       aes(xmin = pred_lo, xmax = pred_up),
+#       height =0,
+#       position = pd,
+#       linewidth = 2,
+#     )+
+#     geom_point(position = pd,size = 5)+ 
+#     scale_alpha_manual(
+#       values = c(`TRUE` = 0.3, `FALSE` = 1),
+#       guide = "none"
+#     ) +
+#     scale_color_manual(values =sp_colors)+
+#     xlab("")+
+#     theme(legend.position="none")+
+#     theme(
+#       axis.title.y = element_blank(),
+#       # axis.text.y  = element_blank(),
+#       axis.ticks.y = element_blank(),
+#       panel.grid.major.y = element_blank(),
+#       panel.grid.major = element_blank(),
+#       panel.grid.minor = element_blank(),
+#       panel.border = element_blank(),
+#       plot.border  = element_blank(),
+#       axis.line.x = element_line(color = "black", linewidth = 2),
+#       panel.background = element_rect(fill = "transparent", color = NA),
+#       plot.background  = element_rect(fill = "transparent", color = NA),
+#       axis.text.x = element_text(size = 24)
+#     );print(plot)
+# })
+
+# # CSI Plots (v2)  --------------------------
+# 
+# # Find only significant interactions
+# sig_df <- coef_df %>% 
+#   filter(
+#     z_var != "int",
+#     x_var != "int",
+#     !overlap0
+#     ) %>% 
+#   mutate(sig = T) %>% 
+#   distinct(
+#     species,
+#     response,
+#     x_var,
+#     z_var,
+#     sig
+#     )
+# 
+# 
+# minmax_slopes <-predicted_slopes %>% 
+#   group_by(
+#     response,
+#     species,
+#     x_var,
+#     z_var
+#   ) %>% 
+#   mutate(
+#     z_range = case_when(
+#       z_range == min(z_range) ~ "min",
+#       z_range == max(z_range) ~ "max"
+#     ),
+#     overlap0 = case_when(
+#       pred_up*pred_lo > 0 ~ F,
+#       T ~T
+#     )
+#   ) %>% 
+#   ungroup() %>% 
+#   filter(
+#     !is.na(z_range),
+#     x_var != "int"
+#   ) %>% 
+#   select(-pred_up,-pred_lo) %>% 
+#   pivot_wider(
+#     names_from = z_range,
+#     values_from = c(pred_md,overlap0)
+#   ) %>% 
+#   mutate(
+#     overlap0_all =case_when(
+#       overlap0_min & overlap0_max ~ T,
+#       T~F
+#     )) %>% 
+#   left_join(
+#     sig_df,
+#     by = join_by(response,species, x_var, z_var)
+#   ) %>% 
+#   mutate(
+#     pred_md_min = case_when(sig ~ pred_md_min),
+#     pred_md_max = case_when(sig ~ pred_md_max),
+#     overlap0_min = case_when(sig ~ overlap0_min),
+#     overlap0_max = case_when(sig ~ overlap0_max),
+#     overlap0_all = case_when(sig ~ overlap0_all)
+#   )
+# 
+# sp_colors <- 
+#   c("all" = "black",
+#     "FUNCHR" = "#b5a331",
+#     "GAMHOL" = "#339d38",
+#     "HETFOR" = "#c26a77",
+#     "JORFLO" = "#8c6d3f",
+#     "LUCGOO" = "#2f2585",
+#     "POELAT" = "#2b695c"
+#     )
+# 
+# # sp_colors <- 
+# #   rev(c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c"))
+# pd <- position_dodge(width = .8)
+# 
+# responses <- c("sample_den","biomass_mean","production_mean","ptob")
+# lapply(responses, function(r) {
+#   
+# 
+#   
+#   plot_df <- minmax_slopes %>% 
+#     filter(response == r #,
+#           # z_var == "pisc_index"
+#            # z_var == "wet_sum_365day"
+#            ) %>% 
+#     mutate(
+#       x_var = factor(
+#         x_var,
+#         levels= rev(c("int","depth","dsldd_int","plt_cov_int","peri_vol_int"))
+#       ),
+#       species = forcats::fct_rev(species),
+#       z_var = factor(
+#         z_var,
+#         levels = c("wet_sum_365day", "pisc_index")
+#       ),
+#       dodge_group = interaction(
+#         species,
+#         z_var,
+#         sep = "_",
+#         lex.order = TRUE
+#       )
+#     )
+#   
+#   
+#   plot <- ggplot(
+#     data=plot_df, 
+#     aes(
+#       y=x_var,
+#       x=pred_md_max,
+#       color = species,
+#       alpha = overlap0_all,
+#       group = dodge_group
+#       )
+#   ) +
+#     geom_vline(xintercept = 0, color = "red",linewidth =2) + 
+#     geom_errorbarh(
+#       aes(
+#         xmin = pred_md_min, 
+#         xmax = pred_md_max,
+#         linetype = z_var
+#         ),
+#       height =0,
+#       position = pd,
+#       linewidth = 2,
+#     )+
+#     geom_point(
+#       aes(
+#         y=x_var,
+#         x=pred_md_max,
+#         color = species,
+#         alpha = overlap0_max)
+#       ,
+#       position = pd,
+#       size = 5,
+#       shape = 17)+ 
+#     geom_point(
+#       aes(
+#         y=x_var,
+#         x=pred_md_min,
+#         color = species,
+#         alpha = overlap0_min
+#         ),
+#       position = pd,
+#       size = 5,
+#       shape = 15
+#       )+ 
+#     scale_alpha_manual(
+#       values = c(`TRUE` = 0.3, `FALSE` = 1),
+#       guide = "none"
+#     ) +
+#     scale_color_manual(values =sp_colors)+
+#     xlab("")+
+#     theme(legend.position="none")+
+#     theme(
+#       axis.title.y = element_blank(),
+#       axis.text.y  = element_blank(),
+#       axis.ticks.y = element_blank(),
+#       panel.grid.major.y = element_blank(),
+#       panel.grid.major = element_blank(),
+#       panel.grid.minor = element_blank(),
+#       panel.border = element_blank(),
+#       plot.border  = element_blank(),
+#       axis.line.x = element_line(color = "black", linewidth = 2),
+#       panel.background = element_rect(fill = "transparent", color = NA),
+#       plot.background  = element_rect(fill = "transparent", color = NA),
+#       axis.text.x = element_text(size = 24)
+#     )#+
+#     # labs(title = r);#print(plot)
+#   
+#   plot_name <- paste0("coef_csi_plot_",r,".png")
+#   plot_height <- 10
+#   ggsave(
+#     file.path(
+#       plot_dir,
+#       "csi_coef",
+#       plot_name
+#     ),
+#     plot = plot,
+#     bg = "transparent",
+#     width = 5,
+#     height = plot_height,
+#     dpi = 300
+#   )
+# })
+
+
+# # CSI Plots (v3)  --------------------------
+# 
+# # Find only significant interactions
+# sig_df <- coef_df %>% 
+#   filter(
+#     z_var != "int",
+#     x_var != "int",
+#     !overlap0
+#   ) %>% 
+#   mutate(sig = T) %>% 
+#   distinct(
+#     species,
+#     response,
+#     x_var,
+#     z_var,
+#     sig
+#   )
+# 
+# # Population level coefficents
+# pop_coef <- coef_df %>% 
+#   filter(
+#     z_var == "int",
+#     x_var != "int"
+#   ) %>% 
+#   rename(
+#     overlap0_all = overlap0
+#   ) %>% 
+#   select(
+#     species,
+#     response,
+#     x_var,
+#     z_var,
+#     mean,
+#     lwr,
+#     upr,
+#     overlap0_all
+#   ) %>% 
+#   anti_join(sig_df %>% distinct(species,response,x_var))
+# 
+# 
+# minmax_slopes <-predicted_slopes %>% 
+#   group_by(
+#     response,
+#     species,
+#     x_var,
+#     z_var
+#   ) %>% 
+#   mutate(
+#     z_range = case_when(
+#       z_range == min(z_range) ~ "min",
+#       z_range == max(z_range) ~ "max"
+#     ),
+#     overlap0 = case_when(
+#       pred_up*pred_lo > 0 ~ F,
+#       T ~T
+#     )
+#   ) %>% 
+#   ungroup() %>% 
+#   filter(
+#     !is.na(z_range),
+#     x_var != "int"
+#   ) %>% 
+#   select(-pred_up,-pred_lo) %>% 
+#   pivot_wider(
+#     names_from = z_range,
+#     values_from = c(pred_md,overlap0)
+#   ) %>% 
+#   mutate(
+#     overlap0_all =case_when(
+#       overlap0_min & overlap0_max ~ T,
+#       T~F
+#     )) %>% 
+#   right_join(
+#     sig_df,
+#     by = join_by(response,species, x_var, z_var)
+#   ) %>% 
+#   # mutate(
+#   #   pred_md_min = case_when(sig ~ pred_md_min),
+#   #   pred_md_max = case_when(sig ~ pred_md_max),
+#   #   overlap0_min = case_when(sig ~ overlap0_min),
+#   #   overlap0_max = case_when(sig ~ overlap0_max),
+#   #   overlap0_all = case_when(sig ~ overlap0_all)
+#   # ) %>% 
+#   bind_rows(pop_coef)
+# 
+# sp_colors <- 
+#   c("all" = "black",
+#     "FUNCHR" = "#b5a331",
+#     "GAMHOL" = "#339d38",
+#     "HETFOR" = "#c26a77",
+#     "JORFLO" = "#8c6d3f",
+#     "LUCGOO" = "#2f2585",
+#     "POELAT" = "#2b695c"
+#   )
+# 
+# # sp_colors <- 
+# #   rev(c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c"))
+# pd <- position_dodge(width = .8)
+# 
+# responses <- c("sample_den","biomass_mean","production_mean","ptob")
+# lapply(responses, function(r) {
+#   
+#   
+#   
+#   plot_df <- minmax_slopes %>% 
+#     filter(response == r) %>% 
+#     mutate(
+#       x_var = factor(
+#         x_var,
+#         levels= rev(c("int","depth","dsldd_int","plt_cov_int","peri_vol_int"))
+#       ),
+#       species = forcats::fct_rev(species),
+#       z_var = factor(
+#         z_var,
+#         levels = rev(c("int","wet_sum_365day", "pisc_index"))
+#       ),
+#       dodge_group = interaction(
+#         species,
+#         z_var,
+#         sep = "_",
+#         lex.order = TRUE
+#       )
+#     )
+#   
+#   
+#   plot <- ggplot(
+#     data=plot_df, 
+#     aes(
+#       y=x_var,
+#       x=pred_md_max,
+#       color = species,
+#       alpha = overlap0_all,
+#       group = dodge_group,
+#       linewidth = species,
+#       size = species
+#     )
+#   ) +
+#     geom_vline(xintercept = 0, color = "red",linewidth =2) + 
+#     geom_errorbarh(
+#       aes(
+#         xmin = upr, 
+#         xmax = lwr,
+#       ),
+#       height =0,
+#       position = pd,
+#       # linewidth = 2,
+#     )+
+#     geom_errorbarh(
+#       aes(
+#         xmin = pred_md_min, 
+#         xmax = pred_md_max,
+#         linetype = z_var
+#       ),
+#       height =0,
+#       position = pd,
+#       # linewidth = 2,
+#     )+
+#     geom_point(
+#       aes(
+#         y=x_var,
+#         x=mean,
+#         color = species
+#       ),
+#       position = pd,
+#       # size = 5
+#     )+ 
+#     geom_point(
+#       aes(
+#         y=x_var,
+#         x=pred_md_max,
+#         color = species,
+#         alpha = overlap0_max)
+#       ,
+#       position = pd,
+#       # size = 5,
+#       shape = 17)+ 
+#     geom_point(
+#       aes(
+#         y=x_var,
+#         x=pred_md_min,
+#         color = species,
+#         alpha = overlap0_min
+#       ),
+#       position = pd,
+#       # size = 5,
+#       shape = 15
+#     )+ 
+#     scale_alpha_manual(
+#       values = c(`TRUE` = 0.3, `FALSE` = 1),
+#       guide = "none"
+#     ) +
+#     scale_linetype_manual(values = c("41","11","solid"))+
+#     scale_linewidth_manual(values = rev(c(3,rep(2,6))))+
+#     scale_size_manual(values = rev(c(8,rep(5,6))))+
+#     scale_color_manual(values =sp_colors)+
+#     xlab("")+
+#     theme(legend.position="none")+
+#     theme(
+#       axis.title.y = element_blank(),
+#       axis.text.y  = element_blank(),
+#       axis.ticks.y = element_blank(),
+#       panel.grid.major.y = element_blank(),
+#       panel.grid.major = element_blank(),
+#       panel.grid.minor = element_blank(),
+#       panel.border = element_blank(),
+#       plot.border  = element_blank(),
+#       axis.line.x = element_line(color = "black", linewidth = 2),
+#       panel.background = element_rect(fill = "transparent", color = NA),
+#       plot.background  = element_rect(fill = "transparent", color = NA),
+#       axis.text.x = element_text(size = 24)
+#     )#+
+#   #labs(title = r);print(plot)
+#   
+#   plot_name <- paste0("coef_csi_plot_",r,"_v3.png")
+#   plot_height <- 13
+#   ggsave(
+#     file.path(
+#       plot_dir,
+#       "csi_coef",
+#       plot_name
+#     ),
+#     plot = plot,
+#     bg = "transparent",
+#     width = 5,
+#     height = plot_height,
+#     dpi = 300
+#   )
+# })
