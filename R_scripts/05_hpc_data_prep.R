@@ -141,6 +141,8 @@ input_list <- lapply(1:n_cb, function(i){
   z_df_raw <- regyear_df %>% 
     mutate(int = 1) %>% 
     select(
+      wateryear,
+      region,
       reg_id,
       int,
       wet_sum_365day,
@@ -151,7 +153,11 @@ input_list <- lapply(1:n_cb, function(i){
   z_list <- lapply(1:max(reg_bridge), function(r){
     z_df <- z_df_raw %>% 
       filter(reg_id == r) %>% 
-      select(-reg_id) %>% 
+      select(
+        -reg_id,
+        -region,
+        -wateryear
+        ) %>% 
       mutate(across(!int,~as.numeric(scale(.x))))
   })
   z_bind <- abind(z_list,along = 3)
@@ -190,15 +196,15 @@ input_list <- lapply(1:n_cb, function(i){
 }
 )
 
+# Prepare list for exporting
+names(input_list) <- apply(cb, 1, paste, collapse = "_")
+input_list_t <- transpose(input_list)
+
 
 # Export  ----------------------------------------------------------------------
 
 # Formatted and filtered production data
 saveRDS(prod_final,file.path(input_dir, "fsprod_formatted.rds"))
-
-# Prepare list for exporting
-names(input_list) <- apply(cb, 1, paste, collapse = "_")
-input_list_t <- transpose(input_list)
 
 # HPC analysis data
 stan_list <- input_list_t$stan_data
