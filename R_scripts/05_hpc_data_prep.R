@@ -123,7 +123,7 @@ input_list <- lapply(1:n_cb, function(i){
   ## Predictor prep  ##
   
   # Select 1st-level predictors (create column of 1 for intercept)
-  x_df <- site_df %>% 
+  x_df_raw <- site_df %>% 
     mutate(int = 1) %>% 
     select(
       int,
@@ -131,29 +131,41 @@ input_list <- lapply(1:n_cb, function(i){
       dsldd_int,
       plt_cov_int,
       peri_vol_int
-    ) %>% 
-    
-    # scale and center data
+    )
+  
+  # scale and center data
+  x_df <- x_df_raw %>% 
     mutate(across(!int,~as.numeric(scale(.x))))
   
-  # Select 2nd level predictors (create column of 1 for intercept) and create
+  # Select 2nd level predictors (create column of 1 for intercept)
+  z_df_raw <- regyear_df %>% 
+    mutate(int = 1) %>% 
+    select(
+      reg_id,
+      int,
+      wet_sum_365day,
+      pisc_index
+    )
+  
+  # Arrange predictors into an array, and scale and center data
   z_list <- lapply(1:max(reg_bridge), function(r){
-    z_df <- regyear_df %>% 
+    z_df <- z_df_raw %>% 
       filter(reg_id == r) %>% 
-      mutate(int = 1) %>% 
-      select(
-        int,
-        wet_sum_365day,
-        pisc_index
-      ) %>% 
-      
-      # scale and center data
+      select(-reg_id) %>% 
       mutate(across(!int,~as.numeric(scale(.x))))
   })
   z_bind <- abind(z_list,along = 3)
   z_data <- aperm(z_bind,c(3,1,2))
+  dimnames(z_data)[[1]] <- site_df %>% 
+    distinct(region,reg_id) %>% 
+    arrange(reg_id) %>% 
+    pull(region)
+  dimnames(z_data)[[2]] <- site_df %>% 
+    distinct(wateryear,year_id) %>% 
+    arrange(year_id) %>% 
+    pull(wateryear)
   
-  
+
   ## Stan list  ##
   stan_data <- list(
     # M = 60,
@@ -173,7 +185,7 @@ input_list <- lapply(1:n_cb, function(i){
     z = z_data
   )
   
-  list(stan_data = stan_data, xbridge = site_df, zbridge = regyear_df)
+  list(stan_data = stan_data, xbridge = x_df_raw, zbridge = z_df_raw)
   
 }
 )
@@ -205,7 +217,6 @@ lapply(1:n_cb,function(i){
 # Plot label data bridges
 xbridge_list <-input_list_t$xbridge
 zbridge_list <-input_list_t$zbridge
-saveRDS(xbridge_list, file.path())
-saveRDS(zbridge_list, file.path())
+saveRDS(xbridge_list, file.path(input_dir,"csi_model_x_bridge.rds"))
+saveRDS(zbridge_list, file.path(input_dir,"csi_model_z_bridge.rds"))
 
-hist(stan_list$JORFLO_sample_den$y,breaks=40)
