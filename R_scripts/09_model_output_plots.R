@@ -12,6 +12,7 @@ library(ggplot2)
 out_dir <- "stan_outputs"
 data_dir <- "hpc/data"
 plot_dir <- "figures"
+prod_dir <- "prod_data"
 
 
 # Load in model out puts
@@ -20,10 +21,14 @@ out_files <- list.files(out_dir,".rds$")
 out_list <- lapply(out_files, function(x) readRDS(file.path(out_dir,x)))
 names(out_list) <- gsub("_stan_out_M100.rds|_stan_out.rds","",out_files)
 
-# load in data
+# Load in data
 data_files <- list.files(data_dir)
 data_list <- lapply(data_files, function(x) readRDS(file.path(data_dir,x)))
 names(data_list) <- gsub("_input_data.rds","",data_files)
+
+# Load in bridges
+x_bridge_list <- readRDS(file.path(prod_dir,"csi_model_x_bridge.rds"))
+z_bridge_list <- readRDS(file.path(prod_dir,"csi_model_z_bridge.rds"))
 
 # Model names
 mods <- names(out_list)
@@ -192,12 +197,11 @@ z_list <- lapply(mods, function(m){
 names(z_list) <- names(out_list)
 
 
-
 # Predicted slopes  ------------------------------------------------------------
 pred_len <- 100
 n_iter <- 1000
 
-# Use second level gamma paramters to predict 1st level slopes across predictors
+# Use second level gamma parameters to predict 1st level slopes across predictors
 predicted_slopes <- lapply(mods, function(m){
   
   # Extract species and response
@@ -209,8 +213,9 @@ predicted_slopes <- lapply(mods, function(m){
   gamma_draws <- out$draws("gamma",format = "draws_matrix")
   n_draws <- nrow(gamma_draws)
   z_data <- z_list[[m]]
+  z_bridge <- z_bridge_list[[m]]
   
-  # FInd all combinations of variables
+  # Find all combinations of variables
   var_combo <- gamma_bridge[[m]] %>% 
     distinct(z_var,x_var) %>% 
     filter(z_var != "int")
@@ -219,19 +224,26 @@ predicted_slopes <- lapply(mods, function(m){
     vars <- var_combo[v,]
     predictor <- vars$z_var
     
+    # Create z predictor inputs
     z_mat <- matrix(
       0,
       nrow = pred_len,
       ncol = ncol(z_data %>% select(-region,-wateryear))
     )
     colnames(z_mat) <- colnames(z_data %>% select(-region,-wateryear))
-    
     z <- z_data[,predictor]
     z_mat[,predictor] <- seq(min(z),max(z),length.out = pred_len)
     z_mat[,"int"] <- 1
     
+    # Prepare raw data for plotting
+    z_raw <- z_bridge[[predictor]]
+    z_raw_range <- seq(min(z_raw),max(z_raw),length.out = pred_len)
+    
+    # Create n iterations of beta predictions using gamma params
     pred_vec <- NULL
     for(i in seq_len(n_iter)) {
+      
+      # Extract a draw of gamma, and format
       iter <- sample(seq_len(n_draws),1,replace = T)
       gamma <- as.data.frame(gamma_draws[iter,]) %>% 
         pivot_longer( 
@@ -245,19 +257,23 @@ predicted_slopes <- lapply(mods, function(m){
         ) %>% 
         filter(x_var == vars$x_var) %>% 
         pull(coef)
+      
+      # Create prediction
       pred <- z_mat %*% gamma
       pred_vec <- cbind(pred_vec,pred)
     }
+    
+    # Summarize prediction in data.frame
     pred_df <- data.frame(
       response = response,
       species = sp,
       x_var = vars$x_var,
       z_var = predictor,
       z_range=z_mat[,predictor],
+      z_raw_range = z_raw_range,
       pred_md = apply(pred_vec, 1, quantile, probs=0.5),
       pred_up = apply(pred_vec, 1, quantile, probs=0.975),
       pred_lo = apply(pred_vec, 1, quantile, probs=0.025)
-      
     )
   }
   ) 
@@ -439,7 +455,7 @@ minmax_slopes <-predicted_slopes %>%
       T~F
     )) %>% 
   
-  # Remove nonsignficant CSI's and ...
+  # Remove significant CSI's and ...
   right_join(
     sig_df,
     by = join_by(response,species, x_var, z_var)
@@ -634,9 +650,10 @@ lapply(responses, function(r) {
 # Gamma plots  -----------------------------------------------------------------  
 gamma_plots <- lapply(mods,function(m){ 
   
-  # Load in parametes and data
+  # Load in parameters and data
   z_data <- z_list[[m]]
   beta <- beta_list[[m]]
+  z_bridge <- z_bridge_list[[m]]
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
   res <- stringr::str_split_fixed(m, "_", n = 2)[2]
   
@@ -662,8 +679,9 @@ gamma_plots <- lapply(mods,function(m){
     ### Create data frame with actual slope values  ###
     
     # Extract predictor data for region and wateryear
-    z_df <- z_data
-    z_df[,"z"] <- z_data[[predictor]]
+    # z_df <- z_data
+    z_df <- z_bridge
+    z_df[,"z"] <- z_df[[predictor]]
     
     # Merge predictor data into slope data
     slope_df <- beta %>% 
@@ -676,8 +694,18 @@ gamma_plots <- lapply(mods,function(m){
     #### Create plots  ###
     g_plot <- ggplot(
       data=pred_df,
-      aes(x = z_range,y = pred_md)
+      aes(
+        x = z_raw_range,
+        y = pred_md
+        )
     )+
+      geom_abline(
+        slope = 0,
+        intercept = 0, 
+        color = "black",
+        linewidth = 1.5,
+        linetype = "dotted"
+        )+
       geom_smooth(color="black")+
       geom_ribbon(
         aes(ymin = pred_lo,ymax =pred_up),
@@ -691,6 +719,7 @@ gamma_plots <- lapply(mods,function(m){
           y=mean, 
           alpha = overlap0,
           color = mean > 0
+          # color = mean
           ),
         size = 2.5
       )+
@@ -702,6 +731,7 @@ gamma_plots <- lapply(mods,function(m){
           ymax = upr,
           alpha = overlap0,
           color = mean > 0
+          # color = mean
           ),
         linewidth = 1,
         inherit.aes = FALSE
@@ -712,8 +742,15 @@ gamma_plots <- lapply(mods,function(m){
       ) +
       # scale_color_gradient(low = "red", high = "blue")+
       # scale_color_manual(values = c("black","grey"))+
-      scale_color_manual(values = c("TRUE" = "darkblue", "FALSE" = "darkred")) +
-      geom_abline(slope = 0,intercept = 0, color = "red",linewidth = 1.5)+
+      # scale_color_gradient2(
+      #   low = "blue",       # Color for negative values
+      #   # mid = "white",      # Color for zero
+      #   high = "red",       # Color for positive values
+      #   midpoint = 0        # Forces white to sit exactly at 0
+      # )+
+      scale_color_manual(
+        values = c("TRUE" = "blue", "FALSE" = "red")
+        ) +
       theme_classic()+
       theme(
         axis.text.x = element_text(size = 18),  
@@ -769,9 +806,7 @@ pred_len <- 100
 n_iter <- 1000
 
 # Create response predictions using slopes at min and max CSI values
-pred_list <- lapply(
-  mods, 
-  function(m){
+pred_list <- lapply(mods, function(m){
   
   # Extract species and response
   sp <- stringr::str_split_fixed(m, "_", n = 2)[1]
@@ -782,6 +817,7 @@ pred_list <- lapply(
   gamma_draws <- out$draws("gamma",format = "draws_matrix")
   n_draws <- nrow(gamma_draws)
   x_data <- data_list[[m]]$x
+  x_bridge <- x_bridge_list[[m]]
   z_data <- z_list[[m]]
   
   ### 2nd level predictions  ###
@@ -869,6 +905,10 @@ pred_list <- lapply(
     x_mat[,x_v] <- seq(min(x_vec),max(x_vec),length.out = pred_len)
     x_mat[,"int"] <- 1
     
+    # Prepare raw data for plotting
+    x_raw <- x_bridge[[x_v]]
+    x_raw_range <- seq(min(x_raw),max(x_raw),length.out = pred_len)
+    
     # Create predictions for every iteration of gamma predictions
     pred_list <- lapply(minmax_list, function(df){
       
@@ -896,6 +936,7 @@ pred_list <- lapply(
       z_var = z_v,
       z_range = z_r,
       x_range=x_mat[,x_v],
+      x_raw_range = x_raw_range,
       pred_md = apply(pred_mat, 1, quantile, probs=0.5),
       pred_up = apply(pred_mat, 1, quantile, probs=0.975),
       pred_lo = apply(pred_mat, 1, quantile, probs=0.025)
@@ -912,15 +953,15 @@ pred_plots <- lapply(mods, function(m){
   response <- stringr::str_split_fixed(m, "_", n = 2)[2]
   pred_df <- pred_list[[m]] %>% 
     
-    # Remove unsignifanct CSIs
+    # Remove non-significance CSIs
     inner_join(
       sig_df,
       by = join_by(species, response, x_var, z_var)
     ) %>% 
     filter(z_range != "mean")
   
-  # Change one set of mean paramters (doesn't matter which, both are equal) 
-  # to intercept. THese will be used in absence of sig CSI
+  # Change one set of mean parameters (doesn't matter which, both are equal) 
+  # to intercept. These will be used in absence of sig CSI
   for_df <- pred_list[[m]] %>% 
     filter(
       z_var == "pisc_index",
@@ -935,8 +976,8 @@ pred_plots <- lapply(mods, function(m){
   
   # Set maximum y axis values
   y_max <- max(for_df$pred_md, for_df$pred_lo, for_df$pred_up)*1.01
-  y_max <- ceiling(y_max/5)*5
-  # y_min <- min(for_df$pred_md, for_df$pred_lo, for_df$pred_up)*1.01
+  # y_max <- ceiling(y_max/5)*5
+  y_min <- min(for_df$pred_md, for_df$pred_lo, for_df$pred_up)*1.01
   # y_min <- floor(y_min/5)*5
   
   # Create plots for each combination of variables
@@ -968,8 +1009,8 @@ pred_plots <- lapply(mods, function(m){
     plot <- ggplot(
       plot_df,
       aes(
-        x = x_range,
-        y = log(pred_md),
+        x = x_raw_range,
+        y = pred_md,
         colour = group_idx,
         fill = group_idx,
         group = group_idx
@@ -980,15 +1021,15 @@ pred_plots <- lapply(mods, function(m){
       geom_smooth()+
       geom_ribbon(
         aes(
-          ymin = log(pred_lo),
-          ymax = log(pred_up)
+          ymin = pred_lo,
+          ymax = pred_up
         ),
         alpha=0.2,
         colour = NA
       )+
       
       # Axes and other formatting
-      ylim(NA,log(y_max)) +
+      ylim(y_min,y_max) +
       ylab("")+
       xlab("")+
       scale_color_manual(values = z_colors) +
@@ -999,9 +1040,14 @@ pred_plots <- lapply(mods, function(m){
         panel.border =  element_rect(color = "black", fill = NA, size = 1),
         axis.title.y = element_blank(),
         axis.title.x = element_blank(),
-        plot.margin = margin(5, 10, 0, 0)
+        plot.margin = margin(5, 18, 0, 0)
       )
     
+    # Reduce the number of breaks for dsd and peri
+    if(x_v %in% c("dsldd_int", "peri_vol_int")){
+      plot <- plot + scale_x_continuous(n.breaks = 3)
+    }
+
     # Remove labels for plots that will be inside grid
     if(x_v == "depth"){
       plot <- plot + theme(axis.text.y = element_text(size = 18))
@@ -1069,7 +1115,7 @@ lapply(species, function(s){
     plot = plot,
     width = 12,
     height = 8,
-    dpi = 300
+    dpi = 600
   )
   
 })
