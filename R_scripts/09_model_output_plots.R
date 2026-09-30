@@ -691,6 +691,10 @@ gamma_plots <- lapply(mods,function(m){
         by = join_by(region, wateryear)
       ) 
     
+    # x axis name
+    if(predictor == "wet_sum_365day") x_name <- "Hydroperiods (days)"
+    if(predictor == "pisc_index") x_name <- "Predator abundance (CPUE)"
+    
     #### Create plots  ###
     g_plot <- ggplot(
       data=pred_df,
@@ -751,17 +755,17 @@ gamma_plots <- lapply(mods,function(m){
       scale_color_manual(
         values = c("TRUE" = "blue", "FALSE" = "red")
         ) +
+      ylab("")+
+      xlab(x_name)+
       theme_classic()+
       theme(
+        axis.title.x = element_text(size = 18),
         axis.text.x = element_text(size = 18),  
         axis.text.y = element_text(size = 18),
         legend.position = "none",
-        panel.border =  element_rect(color = "black", fill = NA, size = 1)
-      )+
-      # ylab(paste0("Slope of annual ",p,"-production relationship"))+
-      # xlab("Wetted days")
-      ylab("")+
-      xlab("")
+        panel.border =  element_rect(color = "black", fill = NA, size = 1),
+        plot.margin = margin(r = 20, unit = "pt")
+      )
     # print(g_plot)
     g_plot
     
@@ -789,13 +793,44 @@ plotter("LUCGOO","ptob","wet_sum_365day","dsldd_int")
 plotter("LUCGOO","biomass_mean","wet_sum_365day","dsldd_int")
 
 # These can be in manuscript
-plotter("all","production_mean","pisc_index","plt_cov_int")
-plotter("all","production_mean","wet_sum_365day","depth")
-plotter("all","biomass_mean","pisc_index","plt_cov_int")
-plotter("all","biomass_mean","wet_sum_365day","depth")
-plotter("all","sample_den","pisc_index","plt_cov_int")
-plotter("all","sample_den","wet_sum_365day","depth")
-plotter("all","ptob","wet_sum_365day","plt_cov_int")
+
+
+
+
+
+
+p <-list(
+  plotter("all","sample_den","wet_sum_365day","depth"),
+  plotter("all","biomass_mean","wet_sum_365day","depth"),
+  plotter("all","production_mean","wet_sum_365day","depth"),
+  NULL,
+  plotter("all","sample_den","pisc_index","plt_cov_int"),
+  plotter("all","biomass_mean","pisc_index","plt_cov_int"),
+  plotter("all","production_mean","pisc_index","plt_cov_int"),
+  plotter("all","ptob","wet_sum_365day","plt_cov_int")
+
+)
+
+a <-cowplot::plot_grid(
+  plotlist = p,
+  ncol = 4,
+  nrow = 2,
+  align = "hv",
+  axis = "none",
+  byrow = TRUE
+)
+
+ggsave(
+  file.path(
+    plot_dir,
+    "csi_plot",
+    "csi_plot_all.png"
+    ),
+  dpi = 600,
+  height = 8,
+  width = 16
+)
+
 
 
 # First level plot with CSI  ---------------------------------------------------
