@@ -169,6 +169,37 @@ sp_colors <-
 response <- c("sample_den","biomass_mean","production_mean","ptob")
 
 
+# Response summary  ------------------------------------------------------------
+
+# Change zero Ptob into NA
+summary_df <- prod_df %>% 
+  mutate(ptob = case_when(
+    ptob == 0 ~ NA,
+    T~ptob
+    )
+  )
+
+# Total response summary
+summary_df %>% 
+  filter(
+    species == "all",
+    ) %>% 
+  select(sample_den,biomass_mean,production_mean,ptob) %>% 
+  summary()
+
+# Total PtoB range
+summary_df %>% 
+  select(ptob) %>% 
+  summary()
+
+# Species comparison
+summary_df %>% 
+  select(species,sample_den,biomass_mean,production_mean,ptob) %>% 
+  group_by(species) %>% 
+  summarise(across(everything(),~median(.x,na.rm = T))) %>% 
+  arrange(biomass_mean)
+  
+  
 # Response boxplots  -----------------------------------------------------------
 
 bar_list <- lapply(response, function(r){
@@ -240,7 +271,7 @@ ggsave(
   file.path(
     plot_dir,
     "response_barplot",
-    "response_barplot.png"
+    "_response_barplot.png"
   ),
   plot = barplot,
   width = 8,
