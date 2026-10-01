@@ -32,7 +32,7 @@ input_dir <- "input_data"
 len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-07-09.rds"))
 
 
-# Filter data  -----------------------------------------------------------------
+# Data preperation  ------------------------------------------------------------
 
 # For this manuscript we will only focus on the 6 most abundant species:
 sp <- c(
@@ -42,10 +42,35 @@ sp <- c(
   "JORFLO",
   "LUCGOO",
   "POELAT",
-  "NOFISH"  # inlcude sites with no fish as true zeros
-  )
+  "NOFISH"  # include sites with no fish as true zeros
+)
 len_filtered <- len_df %>% 
   filter(species %in% sp)
+
+
+# Length summary  --------------------------------------------------------------
+
+# Proportion of data made up by big 6
+len_df %>% 
+  mutate(
+    focal = case_when(
+      species %in% sp ~ T,
+      T ~ F
+    )
+  ) %>% 
+  summarize(
+    tot = n(),
+    n_focal= sum(focal),
+    prop_focal = 100*n_focal/tot
+  )
+
+# Missing lengths
+len_df %>% 
+  summarize(
+    tot = n(),
+    n_missing= length(length[is.na(length)]),
+    prop_missing = 100*n_missing/tot
+  )
 
 # How many fish are missing lengths per species
 len_filtered %>% 
@@ -54,7 +79,7 @@ len_filtered %>%
     tot = n(),
     n_missing= length(length[is.na(length)]),
     prop_missing = 100*n_missing/tot
-    )
+  )
 # less than 1 percent of the fish per each species is missing lengths
 # these will be imputed below
 
