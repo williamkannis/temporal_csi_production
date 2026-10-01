@@ -10,7 +10,7 @@ stan_dir <- "hpc/stan_scripts"
 
 
 # Hurdle predictors  -----------------------------------------------------------
-rm(list=ls())
+
 # Simulation input
 group_size = 5
 nest_size = 7
@@ -27,6 +27,8 @@ gamma <- list(  # first value in each vector is beta intercept
 beta_hurdle <- c(-1.5,.1,-.3,.7,-.6)
 tau_T <- c(.41,.15,.46,.21,.21)
 tau_S <- .69
+tau_S <- c(.69, .3, .1)
+tau_S <- c(.69, .69, .69)
 
 # theta <- .6
 # sd <- .001
@@ -85,6 +87,7 @@ beta <- do.call(
 
 # Create site error
 site_error <- rnorm(K_S,0,tau_S)
+site_error <- sapply(1:K_S, function(s) rnorm(1,0,tau_S[group_r[s]]))
 site_error_full <- site_error[group_s]
 
 # Simulate zeros
@@ -161,7 +164,7 @@ stan_data <- list(
 )
 
 mod <- cmdstan_model(
-  "stan_scripts/hurdle_mvn_second_level_regyear_effects_h_pred.stan"
+  "hpc/stan_scripts/hurdle_mvn_regyear_effects.stan"
 )
 # mod <- cmdstan_model(
 #   "stan_scripts/gamma_mvn_second_level_regyear_effects.stan"

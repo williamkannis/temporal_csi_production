@@ -23,7 +23,8 @@ parameters {
   vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
   vector<lower=0>[K] tau;             // year-level effect coefficents error
-  real<lower=0> tau_s;                // site random effect error
+  // real<lower=0> tau_s;                // site random effect error
+  vector<lower=0>[R] tau_s;           // site random effect error
   real<lower=0> shape;                // Gamma shape parameter
 
 }
@@ -38,8 +39,9 @@ transformed parameters {
     beta[r] = (z[r] * gamma)' + beta_error;
   }
   
-  // site-level MVN random effects - noncentered parametrization
-  vector[S] st_eff = tau_s * st_raw;
+  // site-level random effects - noncentered parametrization
+  // vector[S] st_eff = tau_s * st_raw;
+  vector[S] st_eff = tau_s[rg] .* st_raw;
   
   // hurdle parameters 
   vector[N] logit_hu = x_hurdle * beta_hurdle;
@@ -61,7 +63,7 @@ transformed parameters {
 model {
 
   // Hyperpriors
-  to_vector(gamma) ~ normal(0, 5);
+  to_vector(gamma) ~ normal(0, 1);
   beta_hurdle ~ normal(0, 5);
 
   for (r in 1:R)

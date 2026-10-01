@@ -38,6 +38,7 @@ gamma <- list(  # first value in each vector is beta intercept
   c(.1,.1,0.02))
 tau_T <- c(.41,.15,.46,.21,.21)
 tau_S <- .69
+tau_S <- c(.69, .3, .1)
 
 power <- 1.5
 phi <- 8
@@ -94,6 +95,7 @@ beta <- do.call(
 
 # Create site error
 site_error <- rnorm(K_S,0,tau_S)
+site_error <- sapply(1:K_S, function(s) rnorm(1,0,tau_S[group_r[s]]))
 site_error_full <- site_error[group_s]
 
 # Simulate response data
@@ -123,7 +125,7 @@ x_data <- data %>%
   dplyr::select(intercept,x1,x2,x3,x4)
 
 stan_data <- list(
-  M = 100,
+  M = 60,
   N = nrow(data),
   `T` = n_distinct(data$group_t),
   S = n_distinct(data$group_s),
