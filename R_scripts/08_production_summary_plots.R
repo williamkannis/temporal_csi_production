@@ -43,6 +43,7 @@ seasonal_prod <- prod_df %>%
       .cols = c(
         sample_den,
         biomass_mean,biomass_lwr,biomass_upr,
+        interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr, ## TEMP
         production_mean,production_lwr,production_upr,
         ptob
         ),
