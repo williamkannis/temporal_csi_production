@@ -45,8 +45,22 @@ message("[", Sys.time(), "] Loaded in following arguments: ",arg)
 # Select response type
 message("[", Sys.time(), "] Selecting model response for arg ...")
 mod_arg <- arg[1]
-if(!mod_arg %in% c("sample_den", "ptob","biomass","production")) {
-  stop("mod argument must be 'sample_den' 'ptob', 'biomass', or 'production'")
+if(!mod_arg %in% c(
+  "interval_density", 
+  # "sample_den", 
+  "interval_mean_wt", 
+  "interval_mean_length",
+  # "biomass_mean"
+  "interval_biomass_mean",
+  "production_mean",
+  "ptob"
+  )
+  ) {
+  stop(
+    "mod argument must be 'interval_density', 'interval_mean_wt', ",
+    "'interval_mean_length' 'interval_biomass_mean', 'production_mean', ", 
+    "or 'ptob'"
+    )
 }
 message("[", Sys.time(), "] Model arguement: ",mod_arg," extracted")
 
@@ -72,11 +86,21 @@ message("[", Sys.time(), "] Data loaded")
 message(
   "[", Sys.time(), "] Selecting model type based on response arg: ", mod_arg
   )
-if(mod_arg %in% c("sample_den","biomass","production")) {
+if(mod_arg %in% c(
+  # "sample_den", 
+  "interval_density",
+  # "biomass_mean",
+  "interval_biomass_mean",
+  "production_mean"
+  )) {
   mod_name <- "tweedie_mvn_regyear_effects.stan" 
-  }
+}
 
-if(mod_arg == "ptob"){
+if(mod_arg %in% c(
+  "ptob",
+  "interval_mean_wt", 
+  "interval_mean_length"
+  )){
   mod_name <- "hurdle_mvn_regyear_effects.stan"
 }
 message("[", Sys.time(), "] ",mod_name," selected")
@@ -97,13 +121,14 @@ if(grepl("tweedie",mod_name)) {
   }
   data$M <- M
   message("[", Sys.time(), "] Set M in data to ", M)
+} else {
+  message("[", Sys.time(), "] Hurdle model does not require M input.")
 }
 
 
 # Run models  ------------------------------------------------------------------
 
 # Load in model
-# mod_name <- "tweedie_mvn_regyear_effects.stan"
 message("[", Sys.time(), "] Compiling/loading Stan model...")
 mod <- cmdstan_model(file.path(mod_dir,mod_name))
 message("[", Sys.time(), "] Stan model ready")
