@@ -206,7 +206,6 @@ cbind(means,real) %>%
   ))
 
 
-
 # MVN region-year effects  -----------------------------------------------------
 # Simulation input
 group_size = 5
