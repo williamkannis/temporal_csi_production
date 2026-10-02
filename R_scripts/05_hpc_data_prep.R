@@ -24,6 +24,8 @@ input_dir <- "prod_data"
 export_dir <- "hpc/data"
 
 # Data
+den_size_df <- 
+  readRDS(file.path(input_dir,"fs_densize.rds"))
 prod_df <- 
   readRDS(file.path(input_dir,"fsprod_igr_2026-07-13.rds"))
 phy_site <- 
@@ -43,7 +45,8 @@ prod_all <- prod_for %>%
   summarise(
     across(contains("sample_den"),sum),
     across(contains("biomass"),sum),
-    across(contains("production"),sum)
+    across(contains("production"),sum),
+    .groups = "drop"
   ) %>% 
   mutate(species = "all") %>% 
   bind_rows(prod_for) %>% 
@@ -53,9 +56,12 @@ prod_all <- prod_for %>%
       is.nan(ptob) ~ 0,
       T ~ ptob
     )
-  )
+  ) %>% 
+  
+  # Add interval density and size response
+  left_join(den_size_df)
 
-# Add sample info to production data
+# sample info to production data
 prod_final <- phy_site %>% 
   distinct(wateryear,region,site,cum) %>% 
   filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
@@ -66,6 +72,7 @@ prod_final <- phy_site %>%
 samp_df <- prod_final %>% 
   # transform response varibales to improv convergence
   mutate(
+    interval_mean_wt = interval_mean_wt*1000,
     production_mean = production_mean*1000,
     biomass_mean = biomass_mean*1000,
     ptob = ptob*1000 
@@ -74,7 +81,15 @@ samp_df <- prod_final %>%
 # Number of species response combinations
 cb <- expand.grid(
   unique(samp_df$species),
-  c("production_mean","biomass_mean","ptob","sample_den")
+  c(
+    "interval_density", 
+    "interval_mean_wt", 
+    "interval_mean_length", 
+    "interval_biomass_mean", 
+    "production_mean",
+    "ptob"
+    )
+  # c("production_mean","biomass_mean","ptob","sample_den")
   # c("production_mean","biomass_mean")
   # c("ptob")
 )
