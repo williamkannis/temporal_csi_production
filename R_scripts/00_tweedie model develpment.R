@@ -155,6 +155,21 @@ out <- mod$sample(
 out110$summary()
 out110$diagnostic_summary()
 
+ 
+real <- c(do.call(cbind,gamma),tau_T,tau_S,phi,power)
+# real <- c(do.call(cbind,gamma),tau_T,tau_S,shape)
+means <- out$summary(
+  c("gamma","tau","tau_s","phi","theta"),
+  "mean",
+  quantile, 
+  .args = list(probs = c(0.025, 0.975))
+)
+cbind(means,real) %>% 
+  mutate(overlap = case_when(
+    real >= `2.5%` & real <= `97.5%` ~ T,
+    T~F
+  ))
+
 # out110i <- stan(
 #   file = file.path(stan_dir,"tweedie_mvn_second_level_regyear_effects_opt.stan"),
 #   data = stan_data,
@@ -170,8 +185,8 @@ print(out,pars = c("gamma","tau","tau_s","phi","theta"))
 print(out2,pars = c("gamma","tau","tau_s","phi","theta"))
 
 out110$summary(NULL,"mean")
-post <- out110$draws(c("max_lambda","max_eta")) %>% posterior::as_draws_df()
-post <- out110$draws(c("y_rep","mu","residuals")) %>% posterior::as_draws_df()
+post <- out$draws(c("max_lambda","max_eta")) %>% posterior::as_draws_df()
+post <- out$draws(c("y_rep","mu")) %>% posterior::as_draws_df()
 post <- extract(out110i,c("max_lambda","max_eta"))
 quantile(post$max_lambda,
          c(0, .5, .9, .95, .99, .999, 1))
@@ -184,7 +199,7 @@ bayesplot::ppc_ecdf_overlay(
   stan_data$y,
   post$y_rep[1:100,]
 )
-y_rep <- out110$draws("y_rep", format = "matrix")
+y_rep <- out$draws("y_rep", format = "matrix")
 bayesplot::ppc_dens_overlay(
   stan_data$y,
   y_rep[1:100,]
@@ -192,8 +207,8 @@ bayesplot::ppc_dens_overlay(
 
 loo::loo(loo::extract_log_lik(out110))
 
+lambda_draws <-out$draws("lambda")
 
-lambda_draws <- extract(out110i,"lambda")[[1]]
 
 max_lambda <- quantile(lambda_draws, 0.999)
 
