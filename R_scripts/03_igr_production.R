@@ -10,12 +10,15 @@
 
 # DESCRIPTION: 
 
+## !!  RERUN PRODUCTION WITH NEW LEADED GROUP IDS  !! ##
+
 
 # Housekeeping  ----------------------------------------------------------------
 rm(list = ls())
 
 # Load in packages
 library(dplyr)
+library(tidyr)
 
 # Packages under development (switch to github for publication)
 devtools::load_all("~/Documents/work/R packages/growthstack")
@@ -26,17 +29,17 @@ input_dir <- "input_data"
 export_dir <- "prod_data"
 
 # Growth model directories
-grow_dir <- "~/Documents/Work/Everglades post-doc/Data analysis/growth curves"
-stack_dir <- file.path(grow_dir,"loo_outputs_cat")
-stackJ_dir <- file.path(grow_dir,"loo_outputs")
-mod_dir <- file.path(grow_dir,"stan_outputs/model_out")
+grow_dir <- 
+  "~/Documents/Work/Everglades post-doc/Data analysis/growth curves/outputs"
+stack_dir <- file.path(grow_dir,"loo_outputs")
+mod_dir <- file.path(grow_dir,"stan_outputs")
 
 # Data
 len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
 hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-07-09.rds"))
 wt_df <- read.csv(file.path(input_dir,"length_weight_parameters.csv"))
-stack_list <- readRDS(file.path(stack_dir,"stack_wt_out_2026-06-22.rds"))
-stackJ <- readRDS(file.path(stackJ_dir,"stack_wt_out_2026-06-22.rds"))["JORFLO"]
+stack_list <- readRDS(file.path(stack_dir,"_cat-stack_wt_out.rds"))
+stackJ <- readRDS(file.path(stack_dir,"stack_wt_out.rds"))["JORFLO"]
 
 
 # Data preparation  ------------------------------------------------------------
@@ -44,14 +47,26 @@ stackJ <- readRDS(file.path(stackJ_dir,"stack_wt_out_2026-06-22.rds"))["JORFLO"]
 # Create data.frame containing sampling event, date, sampling area (i.e.,
 # number of traps), and interval between sampling periods
 samp_df <- len_df %>% 
-  left_join(hyd_df) %>% 
-  mutate(group_id = as.numeric(hydroperiod)) %>% 
-  group_by(site,cum,group_id) %>% 
+
+  # Estimate total sampling area and average sampling date
+  group_by(site,cum) %>% 
   summarise(
     date = mean(date,na.rm=T),
     area = n_distinct(plot,throw),
     .groups = "drop"
     ) %>% 
+  
+  # Create group id based on hydroperiod at end of sampling interval
+  left_join(
+    hyd_df,
+    by = join_by(site, cum)
+    ) %>% 
+  group_by(site) %>% 
+  mutate(group_id = lead(as.numeric(hydroperiod),order_by = cum)) %>% 
+  ungroup() %>% 
+  
+  # Estimate sampling interval
+  select(site,cum,date,area,group_id) %>% 
   sample_interval()
 
 # Check if any missing interval has sequential sampling event
@@ -76,7 +91,10 @@ interval_df <- samp_df %>%
 
 # Estimate biomass for each fish and attach sampling info
 bio_df <- len_df %>% 
-  left_join(wt_df) %>% 
+  left_join(
+    wt_df,
+    by = join_by(species)
+    ) %>% 
   mutate(
     wet_wt = 10^(a + b * log10(length*c)),
     wt = wet_wt*.19
@@ -168,6 +186,79 @@ prod_list2 <- lapply(sp, function(s){
 prod_df <- bind_rows(prod_list)
 
 
+# Species-specific Interval density and mean size  -----------------------------
+
+den_size_df <- bio_df %>% 
+  filter(species != "NOFISH") %>% 
+  
+  # Create new data for all species (total response)
+  mutate(species = "all") %>% 
+  
+  # add back in species specific data
+  bind_rows(bio_df %>% filter(species != "NOFISH")) %>% 
+  
+  # Introduce missing species using NA length and wt. No site that contains that
+  # species has an NA for length or WT
+  right_join(
+    samp_df %>% crossing(species = c(sp,"all")),
+    by = join_by(species,site, cum)
+  ) %>% 
+  mutate(
+    length = case_when(
+      is.na(length)~ 0,
+      T ~ length
+    ),
+    wt = case_when(
+      is.na(wt)~ 0,
+      T ~ wt
+    )
+  ) %>% 
+  
+  # Estimate density and sum of size at each sampling event
+  group_by(site,cum,species,area,interval) %>% 
+  summarise(
+    n = sum(length>1),
+    length_sum = sum(length),
+    wt_sum = sum(wt),
+    .groups = "drop"
+  ) %>% 
+  
+  # Estimate average density and size across sampling interval
+  group_by(site,species) %>% 
+  mutate(
+    density = n/area,
+    across(
+      c(n, density, wt_sum, length_sum),
+      ~ case_when(
+        cum + 1 != lead(cum, order_by = cum) ~ NA,
+        TRUE ~ lead(.x, order_by = cum)
+      ),
+      .names = "lead_{.col}"
+    ),
+    interval_n = n+lead_n,
+    interval_density = (density+lead_density)/2,
+    interval_mean_length = case_when(
+      interval_n != 0 ~ (length_sum+lead_length_sum)/interval_n,
+      interval_n == 0 ~ 0
+    ),
+    interval_mean_wt = case_when(
+      interval_n != 0 ~ (wt_sum+lead_wt_sum)/interval_n,
+      interval_n == 0 ~ 0
+    )
+  ) %>% 
+  
+  # Prepare output
+  ungroup() %>% 
+  select(
+    site,
+    cum,
+    species,
+    interval_density,
+    interval_mean_length,
+    interval_mean_wt
+  )
+  
+
 # Export  ----------------------------------------------------------------------
 
 # sample data
@@ -178,5 +269,8 @@ saveRDS(samp_df,file.path(export_dir,samp_file))
 prod_file <- paste0("fsprod_igr_",Sys.Date(),".rds")
 saveRDS(prod_df,file.path(export_dir,prod_file))
 
+# Interval density and size
+den_size_file <- 'fs_densize.rds'
+saveRDS(den_size_df,file.path(export_dir,den_size_file))
 
 
