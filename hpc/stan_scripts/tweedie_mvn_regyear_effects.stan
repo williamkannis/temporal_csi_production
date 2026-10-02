@@ -21,8 +21,8 @@ parameters {
   vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
   vector<lower=0>[K] tau;             // year-level effect coefficents error
-  // real<lower=0> tau_s;                // site random effect error
-  vector<lower=0>[R] tau_s;           // site random effect error
+  real<lower=0> tau_s;                // site random effect error
+  // vector<lower=0>[R] tau_s;           // site random effect error
   real<lower=0> phi;
   real<lower=1, upper=2> theta;
   // real<lower=1.01, upper=1.99> theta;
@@ -40,8 +40,8 @@ transformed parameters {
   }
   
   // site-level MVN random effects - noncentered parametrization
-  // st_eff = tau_s * st_raw;
-  st_eff = tau_s[rg] .* st_raw;
+  st_eff = tau_s * st_raw;
+  // st_eff = tau_s[rg] .* st_raw;
   
 // Mu vector
     vector[N] eta;    

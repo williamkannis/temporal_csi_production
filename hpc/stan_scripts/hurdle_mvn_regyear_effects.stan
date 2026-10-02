@@ -23,8 +23,8 @@ parameters {
   vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
   vector<lower=0>[K] tau;             // year-level effect coefficents error
-  // real<lower=0> tau_s;                // site random effect error
-  vector<lower=0>[R] tau_s;           // site random effect error
+  real<lower=0> tau_s;                // site random effect error
+  // vector<lower=0>[R] tau_s;           // site random effect error
   real<lower=0> shape;                // Gamma shape parameter
 
 }
@@ -40,8 +40,8 @@ transformed parameters {
   }
   
   // site-level random effects - noncentered parametrization
-  // vector[S] st_eff = tau_s * st_raw;
-  vector[S] st_eff = tau_s[rg] .* st_raw;
+  vector[S] st_eff = tau_s * st_raw;
+  // vector[S] st_eff = tau_s[rg] .* st_raw;
   
   // hurdle parameters 
   vector[N] logit_hu = x_hurdle * beta_hurdle;
@@ -107,7 +107,9 @@ generated quantities {
 
   vector[N] log_lik;
   vector[N] y_rep;
-  array[N] real residuals;
+  array[N] real raw_residuals;
+  array[N] real pearson_residual_hurdle;
+  array[N] real pearson_residual_gamma;
 
   for (n in 1:N) {
 
@@ -123,8 +125,28 @@ generated quantities {
 
     }
 
-    // residuals
-    residuals[n] = y[n]-mu[n];
+    // Residuals
+    raw_residuals[n] = y[n]-mu[n];
+    
+
+    {
+      real is_zero = (y[n] == 0);
+
+      pearson_residual_hurdle[n] =
+        (is_zero - hu[n]) /
+        sqrt(hu[n] * (1 - hu[n]));
+    }
+
+    if (y[n] > 0) {
+
+      pearson_residual_gamma[n] =
+        (y[n] - mu[n]) /
+        (mu[n] / sqrt(shape));
+
+    } else {
+
+      pearson_residual_gamma[n] = not_a_number();
+    }
     
     // Posterior predictive draw
     if (bernoulli_rng(hu[n]) == 1) {
