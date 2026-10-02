@@ -55,9 +55,6 @@ ssh_exec_wait(
 
 # Run analyses on cluster  -----------------------------------------------------
 
-# Set M value for all jobs
-M <- 100
-
 # Compile models
 ssh_exec_wait(
   session,
@@ -76,23 +73,47 @@ ssh_exec_wait(
   )
 )
 
-# Production Model runs
+# Set M value for all jobs
+M <- 100
+
+# Density model runs
 ssh_exec_wait(
   session,
   command = paste(
     "sbatch",
     "--array=1-7",
     "--cpus-per-task=4",
-    "--mem=8G",
+    "--mem=16G",
     "--time=9:00:00",
-    "--job-name=production",
+    "--job-name=interval_density",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
     "--wrap",
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/hpc/R_scripts/hpc_csi_analysis.R production ",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R interval_density ",
         M
+      )
+    )
+  )
+)
+
+# Size Model runs
+ssh_exec_wait(
+  session,
+  command = paste(
+    "sbatch",
+    "--array=1-7",
+    "--cpus-per-task=4",
+    "--mem=16G",
+    "--time=0:10:00",
+    "--job-name=interval_mean_wt",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--wrap",
+    shQuote(
+      paste0(
+        "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R interval_mean_wt"
       )
     )
   )
@@ -107,20 +128,20 @@ ssh_exec_wait(
     "--cpus-per-task=4",
     "--mem=8G",
     "--time=9:00:00",
-    "--job-name=biomass",
+    "--job-name=interval_biomass_mean",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
     "--wrap",
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/hpc/R_scripts/hpc_csi_analysis.R biomass ",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R interval_biomass_mean ",
         M
       )
     )
   )
 )
 
-# density Model runs
+# Production Model runs
 ssh_exec_wait(
   session,
   command = paste(
@@ -129,13 +150,13 @@ ssh_exec_wait(
     "--cpus-per-task=4",
     "--mem=16G",
     "--time=9:00:00",
-    "--job-name=sample_den",
+    "--job-name=production_mean",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
     "--wrap",
     shQuote(
       paste0(
         "module load gnu/13 && module load R/4.4.0 && Rscript /gpfs/home/",
-        "wka25/hpc/R_scripts/hpc_csi_analysis.R sample_den ",
+        "wka25/hpc/R_scripts/hpc_csi_analysis.R production_mean ",
         M
       )
     )
@@ -149,7 +170,7 @@ ssh_exec_wait(
     "sbatch",
     "--array=1-7",
     "--cpus-per-task=4",
-    "--mem=8G",
+    "--mem=16G",
     "--time=0:10:00",
     "--job-name=ptob",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
