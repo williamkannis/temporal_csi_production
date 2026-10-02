@@ -86,7 +86,8 @@ ssh_exec_wait(
     "--mem=16G",
     "--time=9:00:00",
     "--job-name=interval_density",
-    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
+    "--mail-type=ALL",
     "--wrap",
     shQuote(
       paste0(
@@ -108,7 +109,8 @@ ssh_exec_wait(
     "--mem=16G",
     "--time=0:15:00",
     "--job-name=interval_mean_wt",
-    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
+    "--mail-type=ALL",
     "--wrap",
     shQuote(
       paste0(
@@ -129,7 +131,8 @@ ssh_exec_wait(
     "--mem=8G",
     "--time=9:00:00",
     "--job-name=interval_biomass_mean",
-    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
+    "--mail-type=ALL",
     "--wrap",
     shQuote(
       paste0(
@@ -151,7 +154,8 @@ ssh_exec_wait(
     "--mem=16G",
     "--time=9:00:00",
     "--job-name=production_mean",
-    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
+    "--mail-type=ALL",
     "--wrap",
     shQuote(
       paste0(
@@ -173,7 +177,8 @@ ssh_exec_wait(
     "--mem=16G",
     "--time=0:15:00",
     "--job-name=ptob",
-    "--output=/gpfs/home/wka25/my_project/results/slurm-%A_%a.out",
+    "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
+    "--mail-type=ALL",
     "--wrap",
     shQuote(
       paste0(
