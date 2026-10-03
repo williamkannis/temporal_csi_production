@@ -18,6 +18,7 @@ prod_dir <- "prod_data"
 # Load in model out puts
 # out_files <- list.files(out_dir,"M100.rds$")
 out_files <- list.files(out_dir,".rds$")
+out_files <- out_files[!grepl("mean_wt",out_files)]
 out_list <- lapply(out_files, function(x) readRDS(file.path(out_dir,x)))
 names(out_list) <- gsub("_stan_out_M100.rds|_stan_out.rds","",out_files)
 
@@ -176,9 +177,9 @@ names(beta_list) <- names(out_list)
 # Extract second level predictor values
 z_list <- lapply(mods, function(m){
   z_data <- data_list[[m]]$z
-  ### TEMP. FIX THIS DATA PREP SCRIPT
-  dimnames(z_data)[[1]] <- c("SRS","TSL","WCA")
-  dimnames(z_data)[[2]] <- 1995:2023
+  # ### TEMP. FIX THIS DATA PREP SCRIPT
+  # dimnames(z_data)[[1]] <- c("SRS","TSL","WCA")
+  # dimnames(z_data)[[2]] <- 1995:2023
   
   # Change into a single data.frame with columns for region and wateryear
   lapply(1:dim(z_data)[[1]], function(x) {
@@ -444,16 +445,16 @@ minmax_slopes <-predicted_slopes %>%
     !is.na(z_range),
     x_var != "int"
   ) %>% 
-  select(-pred_up,-pred_lo) %>% 
-  pivot_wider(
+  select(-pred_up,-pred_lo,-z_raw_range) %>% 
+  tidyr::pivot_wider(
     names_from = z_range,
     values_from = c(pred_md,overlap0)
   ) %>% 
-  mutate(
-    overlap0_all =case_when(
-      overlap0_min & overlap0_max ~ T,
-      T~F
-    )) %>% 
+  # mutate(
+  #   overlap0_all =case_when(
+  #     overlap0_min & overlap0_max ~ T,
+  #     T~F
+  #   )) %>% 
   
   # Remove significant CSI's and ...
   right_join(
@@ -485,7 +486,8 @@ sp_colors <-
     "POELAT" = "#2b695c"
   )
 pd <- position_dodge(width = .8)
-responses <- c("sample_den","biomass_mean","production_mean","ptob")
+# responses <- c("sample_den","biomass_mean","production_mean","ptob")
+responses <- c("interval_density","interval_biomass_mean","production_mean","ptob")
 
 # Create plot for each response
 lapply(responses, function(r) {
@@ -800,12 +802,12 @@ plotter("LUCGOO","biomass_mean","wet_sum_365day","dsldd_int")
 
 
 p <-list(
-  plotter("all","sample_den","wet_sum_365day","depth"),
-  plotter("all","biomass_mean","wet_sum_365day","depth"),
+  plotter("all","interval_density","wet_sum_365day","depth"),
+  plotter("all","interval_biomass_mean","wet_sum_365day","depth"),
   plotter("all","production_mean","wet_sum_365day","depth"),
   NULL,
-  plotter("all","sample_den","pisc_index","plt_cov_int"),
-  plotter("all","biomass_mean","pisc_index","plt_cov_int"),
+  plotter("all","interval_density","pisc_index","plt_cov_int"),
+  plotter("all","interval_biomass_mean","pisc_index","plt_cov_int"),
   plotter("all","production_mean","pisc_index","plt_cov_int"),
   plotter("all","ptob","wet_sum_365day","plt_cov_int")
 
@@ -1107,8 +1109,8 @@ lapply(species, function(s){
   
   # ordering for grid
   resp_order <- c(
-    "sample_den",
-    "biomass_mean",
+    "interval_density",
+    "interval_biomass_mean",
     "production_mean",
     "ptob"
   )
