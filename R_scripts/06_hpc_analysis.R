@@ -128,7 +128,7 @@ ssh_exec_wait(
     "sbatch",
     "--array=1-7",
     "--cpus-per-task=4",
-    "--mem=8G",
+    "--mem=16G",
     "--time=9:00:00",
     "--job-name=interval_biomass_mean",
     "--output=/gpfs/home/wka25/my_project/results/slurm-%x_%A_%a.out",
