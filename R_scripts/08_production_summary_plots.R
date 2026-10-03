@@ -41,9 +41,10 @@ seasonal_prod <- prod_df %>%
   summarise(
     across(
       .cols = c(
-        sample_den,
-        biomass_mean,biomass_lwr,biomass_upr,
-        interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr, ## TEMP
+        # sample_den,
+        interval_density,
+        # biomass_mean,biomass_lwr,biomass_upr,
+        interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr,
         production_mean,production_lwr,production_upr,
         ptob
         ),
@@ -167,8 +168,8 @@ sp <- sp[order(sp)]
 sp_colors <- 
   c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c")
 
-response <- c("sample_den","biomass_mean","production_mean","ptob")
-
+annual_response <- c("sample_den","biomass_mean","production_mean","ptob")
+response <- c("interval_density","interval_biomass_mean","production_mean","ptob")
 
 # Response summary  ------------------------------------------------------------
 
@@ -185,7 +186,8 @@ summary_df %>%
   filter(
     species == "all",
     ) %>% 
-  select(sample_den,biomass_mean,production_mean,ptob) %>% 
+  # select(sample_den,biomass_mean,production_mean,ptob) %>% 
+  select(interval_density,interval_biomass_mean,production_mean,ptob) %>% 
   summary()
 
 # Total PtoB range
@@ -195,10 +197,12 @@ summary_df %>%
 
 # Species comparison
 summary_df %>% 
-  select(species,sample_den,biomass_mean,production_mean,ptob) %>% 
+  # select(species,sample_den,biomass_mean,production_mean,ptob) %>% 
+  select(species,interval_density,interval_biomass_mean,production_mean,ptob) %>% 
   group_by(species) %>% 
   summarise(across(everything(),~median(.x,na.rm = T))) %>% 
-  arrange(biomass_mean)
+  # arrange(biomass_mean)
+  arrange(interval_biomass_mean)
   
   
 # Response boxplots  -----------------------------------------------------------
@@ -283,7 +287,7 @@ ggsave(
 
 # Inter-annual response plots---------------------------------------------------
 
-year_list <- lapply(response[response != "ptob"], function(r){
+year_list <- lapply(annual_response[annual_response != "ptob"], function(r){
   plot_df <-year_prod
   plot_df$y <- plot_df[[r]]
 
@@ -443,8 +447,10 @@ avg_seasonal_prod <- prod_df %>%
   summarise(
     across(
       .cols = c(
-        sample_den,
-        biomass_mean,biomass_lwr,biomass_upr,
+        # sample_den,
+        interval_density,
+        # biomass_mean,biomass_lwr,biomass_upr,
+        interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr,
         production_mean,production_lwr,production_upr,
         ptob),
       .fns = mean
