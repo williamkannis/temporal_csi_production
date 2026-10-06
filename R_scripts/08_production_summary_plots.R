@@ -32,22 +32,40 @@ len_df <-
 
 
 # Data preparation  ------------------------------------------------------------
+# Change zero lengths and P:B into NAs. These were changed to zeros as stan
+# hurdle models need zeros not NAs
+prod_for <- prod_df %>% 
+  mutate(
+    across(
+      .cols = c(
+        mean_wt,
+        mean_length,
+        interval_mean_wt,
+        interval_mean_length,
+        ptob),
+      .fns = \(x) case_when(
+        x == 0 ~ NA,
+        x > 0 ~ x
+      )
+    )
+  )
 
 # seasonal response variables
-seasonal_prod <- prod_df %>% 
+seasonal_prod <- prod_for %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
+  
+
+
   
   # Aggergate to sampling interval
   summarise(
     across(
       .cols = c(
-        # sample_den,
+        interval_mean_wt,
         interval_density,
-        # biomass_mean,biomass_lwr,biomass_upr,
-        interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr,
-        production_mean,production_lwr,production_upr,
-        ptob,
-        interval_mean_wt
+        interval_biomass_mean,
+        production_mean,
+        ptob
         ),
       .fns = mean
     ),
@@ -55,7 +73,7 @@ seasonal_prod <- prod_df %>%
   )
 
 
-year_prod <- prod_df %>% 
+year_prod <- prod_for %>% 
   
   # Change daily production to interval production
   mutate(
@@ -71,16 +89,16 @@ year_prod <- prod_df %>%
   summarise(
     across(
       .cols = c(
-        production_mean,production_lwr,production_upr,interval
+        production_mean,
+        interval
       ),
       .fns = sum
     ),
     across(
       .cols = c(
+        mean_wt,
         sample_den,
-        interval_biomass_mean,
-        biomass_mean,biomass_lwr,biomass_upr,
-        interval_mean_wt
+        biomass_mean
       ),
       .fns = mean
     ),
@@ -90,78 +108,91 @@ year_prod <- prod_df %>%
   # Standardized values to 365 (not all annual intervals are the same)
   mutate(
     across(
-      .cols = c(production_mean,production_lwr,production_upr),
+      .cols = c(production_mean),
       .fns = \(x) x*(365/interval)
-    ),
-    ptob = production_mean/biomass_mean
+    )#,
+    # ptob = production_mean/biomass_mean
   ) %>% 
   
-  # SUmmarized across all sites
+  # Summarized across all sites
   summarize(
     across(
       .cols = c(
+        mean_wt,
         sample_den,
-        biomass_mean,biomass_lwr,biomass_upr,
-        production_mean,production_lwr,production_upr,
-        ptob,
-        interval_mean_wt),
+        biomass_mean,
+        production_mean,
+        # ptob
+        ),
       .fns = mean, na.rm=T
     ),
     .by = c(wateryear,species)
-  )
+  ) %>% 
+  mutate(ptob = production_mean/biomass_mean)
 
 
 # General plot details  --------------------------------------------------------
-sp <- unique(prod_df$species)
+sp <- unique(prod_for$species)
 sp <- sp[order(sp)]
 sp_colors <- 
   c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c")
 
-annual_response <- c("sample_den","biomass_mean","production_mean","ptob")
-response <- c("interval_density","interval_biomass_mean","production_mean","ptob")
+annual_response <- c(
+  "mean_wt",
+  "sample_den",
+  "biomass_mean",
+  "production_mean",
+  "ptob"
+  )
+response <- c(
+  "interval_mean_wt",
+  "interval_density",
+  "interval_biomass_mean",
+  "production_mean",
+  "ptob"
+  )
 
 # Response summary  ------------------------------------------------------------
 
-# Change zero Ptob into NA
-summary_df <- prod_df %>% 
-  mutate(ptob = case_when(
-    ptob == 0 ~ NA,
-    T~ptob
-    )
-  )
 
 # Total response summary
-summary_df %>% 
+prod_for %>% 
   filter(
     species == "all",
     ) %>% 
-  # select(sample_den,biomass_mean,production_mean,ptob) %>% 
-  select(interval_density,interval_biomass_mean,production_mean,ptob) %>% 
+  select(
+    interval_mean_wt,
+    interval_density,
+    interval_biomass_mean,
+    production_mean,
+    ptob
+    ) %>% 
   summary()
 
 # Total PtoB range
-summary_df %>% 
+prod_for %>% 
   select(ptob) %>% 
   summary()
 
 # Species comparison
-summary_df %>% 
-  # select(species,sample_den,biomass_mean,production_mean,ptob) %>% 
-  select(species,interval_density,interval_biomass_mean,production_mean,ptob) %>% 
+prod_for %>% 
+  select(
+    species,
+    interval_mean_wt,
+    interval_density,
+    interval_biomass_mean,
+    production_mean,
+    ptob
+    ) %>% 
   group_by(species) %>% 
   summarise(across(everything(),~median(.x,na.rm = T))) %>% 
-  # arrange(biomass_mean)
   arrange(interval_biomass_mean)
   
   
 # Response boxplots  -----------------------------------------------------------
 
 bar_list <- lapply(response, function(r){
-  plot_df <-prod_df %>% 
-    mutate(ptob = case_when(
-      ptob == 0 ~ NA,
-      T~ptob
-    ))
+  plot_df <-prod_for 
   plot_df$y <- plot_df[[r]]
   plot <- ggplot(
     data = plot_df,
@@ -376,7 +407,7 @@ ggsave(
 
 # Species seasonal plot  -------------------------------------------------------
 
-avg_seasonal_prod <- prod_df %>% 
+avg_seasonal_prod <- prod_for %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
   
   # Aggergate to sampling interval
