@@ -12,6 +12,7 @@
 
 
 # Housekeeping  ----------------------------------------------------------------
+
 rm(list = ls())
 
 # Load in packages
@@ -32,6 +33,7 @@ len_df <-
 
 
 # Data preparation  ------------------------------------------------------------
+
 # Change zero lengths and P:B into NAs. These were changed to zeros as stan
 # hurdle models need zeros not NAs
 prod_for <- prod_df %>% 
@@ -69,7 +71,7 @@ seasonal_prod <- prod_for %>%
     .by = c(wateryear,waterperiod,cum,species)
   )
 
-# Annual response varaibles
+# Annual response variables
 year_prod <- prod_for %>% 
   
   # Change daily production to interval production
@@ -95,7 +97,8 @@ year_prod <- prod_for %>%
       .cols = c(
         mean_wt,
         sample_den,
-        biomass_mean
+        biomass_mean,
+        interval_biomass_mean  # for P:B only
       ),
       .fns = mean
     ),
@@ -107,8 +110,12 @@ year_prod <- prod_for %>%
     across(
       .cols = c(production_mean),
       .fns = \(x) x*(365/interval)
-    )#,
-    # ptob = production_mean/biomass_mean
+    ),
+    ptob = production_mean/interval_biomass_mean
+    # ptob = case_when(
+    #   biomass_mean == 0 ~ NA,
+    #   T ~ production_mean/biomass_mean
+    # )
   ) %>% 
   
   # Summarized across all sites
@@ -119,16 +126,16 @@ year_prod <- prod_for %>%
         sample_den,
         biomass_mean,
         production_mean,
-        # ptob
+        ptob
         ),
       .fns = mean, na.rm=T
     ),
     .by = c(wateryear,species)
-  ) %>% 
-  mutate(ptob = production_mean/biomass_mean)
+  )
 
 
 # General plot details  --------------------------------------------------------
+
 sp <- unique(prod_for$species)
 sp <- sp[order(sp)]
 sp_colors <- 
@@ -148,6 +155,7 @@ response <- c(
   "production_mean",
   "ptob"
   )
+
 
 # Response summary  ------------------------------------------------------------
 
