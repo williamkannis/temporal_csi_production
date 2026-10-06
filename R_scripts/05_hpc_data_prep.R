@@ -141,6 +141,8 @@ input_list <- lapply(1:n_cb, function(i){
   x_df_raw <- site_df %>% 
     mutate(int = 1) %>% 
     select(
+      cum,
+      site,
       int,
       depth,
       dsldd_int,
@@ -150,6 +152,7 @@ input_list <- lapply(1:n_cb, function(i){
   
   # scale and center data
   x_df <- x_df_raw %>% 
+    select(-cum,-site) %>% 
     mutate(across(!int,~as.numeric(scale(.x))))
   
   # Select 2nd level predictors (create column of 1 for intercept)
@@ -188,7 +191,7 @@ input_list <- lapply(1:n_cb, function(i){
   
 
   ## Stan list  ##
-  stan_data <- list(
+  list(
     # M = 60,
     N = nrow(site_df),
     `T` = n_distinct(site_df$year_id),
@@ -202,18 +205,16 @@ input_list <- lapply(1:n_cb, function(i){
     st = site_df$site_id,
     rg = reg_bridge,
     x = x_df,
+    x_raw = x_df_raw,
     x_hurdle = x_df,
-    z = z_data
+    z = z_data,
+    z_raw = z_df_raw
   )
-  
-  list(stan_data = stan_data, xbridge = x_df_raw, zbridge = z_df_raw)
-  
 }
 )
 
 # Prepare list for exporting
 names(input_list) <- apply(cb, 1, paste, collapse = "_")
-input_list_t <- transpose(input_list)
 
 
 # Export  ----------------------------------------------------------------------
@@ -222,22 +223,15 @@ input_list_t <- transpose(input_list)
 saveRDS(prod_final,file.path(input_dir, "fsprod_formatted.rds"))
 
 # HPC analysis data
-stan_list <- input_list_t$stan_data
 lapply(1:n_cb,function(i){
   file_name <- paste0(
-    names(stan_list)[i],
+    names(input_list)[i],
     "_input_data.rds"
   )
   saveRDS(
-    stan_list[[i]],
+    input_list[[i]],
     file.path(export_dir,file_name)
     )
 }
 )
-
-# Plot label data bridges
-xbridge_list <-input_list_t$xbridge
-zbridge_list <-input_list_t$zbridge
-saveRDS(xbridge_list, file.path(input_dir,"csi_model_x_bridge.rds"))
-saveRDS(zbridge_list, file.path(input_dir,"csi_model_z_bridge.rds"))
 
