@@ -54,10 +54,7 @@ prod_for <- prod_df %>%
 seasonal_prod <- prod_for %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
   
-
-
-  
-  # Aggergate to sampling interval
+  # Aggregate to sampling interval
   summarise(
     across(
       .cols = c(
@@ -72,7 +69,7 @@ seasonal_prod <- prod_for %>%
     .by = c(wateryear,waterperiod,cum,species)
   )
 
-
+# Annual response varaibles
 year_prod <- prod_for %>% 
   
   # Change daily production to interval production
@@ -154,7 +151,6 @@ response <- c(
 
 # Response summary  ------------------------------------------------------------
 
-
 # Total response summary
 prod_for %>% 
   filter(
@@ -191,7 +187,7 @@ prod_for %>%
   
 # Response boxplots  -----------------------------------------------------------
 
-bar_list <- lapply(response, function(r){
+box_list <- lapply(response, function(r){
   plot_df <-prod_for 
   plot_df$y <- plot_df[[r]]
   plot <- ggplot(
@@ -233,8 +229,8 @@ bar_list <- lapply(response, function(r){
 )
 
 
-barplot <- cowplot::plot_grid(
-  plotlist = bar_list,
+boxplot <- cowplot::plot_grid(
+  plotlist = box_list,
   ncol = 1,
   align = "v"
 )
@@ -245,114 +241,16 @@ ggsave(
     "response_trend",
     "_response_summary.png"
   ),
-  plot = barplot,
+  plot = boxplot,
   width = 8,
-  height = 12,
+  # height = 12,
+  height = 15,
   dpi = 300
 )
 
 
-# Inter-annual response plots---------------------------------------------------
 
-year_list <- lapply(annual_response[annual_response != "ptob"], function(r){
-  plot_df <-year_prod
-  plot_df$y <- plot_df[[r]]
-
-    theme(legend.position = "none") 
-    
-  plot<-ggplot(
-    data = plot_df%>% filter(species != "all"),
-    aes(
-      x = wateryear,
-      y = y,
-      fill = species
-    )
-  ) +
-    geom_col(
-      position = "stack",
-      width = 0.8
-      )+
-    scale_fill_manual(
-      values = sp_colors[sp!="all"]
-    ) +
-    geom_line(
-      data = plot_df %>% filter(species == "all"),
-      aes(
-        x = wateryear,
-        y = y
-      ),
-      inherit.aes = F,
-      color = "black",
-      linewidth = 1
-    )+
-    theme_classic()+
-    theme(
-      axis.text.x = element_text(size = 18),  
-      axis.text.y = element_text(size = 18),
-      legend.position = "none",
-      panel.border =  element_rect(color = "black", fill = NA, size = 1)
-    )+
-    xlab("")+
-    ylab("")
-  print(plot)
-  plot
-})
-names(year_list) <- response[response != "ptob"]
-
-year_list$ptob <- ggplot(
-  data = year_prod,
-  aes(
-    x = wateryear,
-    y=ptob, 
-    group = species,
-    fill = species
-  )
-)+
-  geom_line(
-    aes(
-      color =  species,
-      linewidth = species
-      )
-    )+
-  # geom_ribbon(
-  #   mapping = aes(ymin = production_lwr,ymax =production_upr),
-  #   alpha=0.2,
-  # )+
-  scale_color_manual(values =sp_colors)+
-  scale_fill_manual(values =sp_colors)+
-  scale_linewidth_manual(values = c(2,rep(1,6)))+
-  theme_classic()+
-  theme(
-    axis.text.x = element_text(size = 18),  
-    axis.text.y = element_text(size = 18),
-    legend.position = "none",
-    panel.border =  element_rect(color = "black", fill = NA, size = 1)
-  )+
-  xlab("")+
-  ylab("")
-
-year_plot <- cowplot::plot_grid(
-  plotlist = year_list,
-  ncol = 1,
-  align = "v"
-)
-
-ggsave(
-  file.path(
-    plot_dir,
-    "response_trend",
-    "_annual_response.png"
-  ),
-  plot = year_plot,
-  width = 8,
-  height = 12,
-  dpi = 300
-)
-  
-
-
-
-# Intra-annual response plots  -------------------------------------------------
+# Seasonal response plots  -------------------------------------------------
 season_list <- lapply(response,function(r){
   plot_df <-seasonal_prod %>% filter(species == "all")
   plot_df$y <- plot_df[[r]]
@@ -381,7 +279,7 @@ season_list <- lapply(response,function(r){
     
     xlab("")+
     ylab("")
-  print(plot)
+  # print(plot)
   plot
 })
 names(season_list) <- response
@@ -400,7 +298,114 @@ ggsave(
   ),
   plot = season_plot,
   width = 8,
-  height = 12,
+  # height = 12,
+  height = 15,
+  dpi = 300
+)
+
+
+# Annual response plots---------------------------------------------------
+
+year_list <- lapply(annual_response, function(r){
+  plot_df <-year_prod
+  plot_df$y <- plot_df[[r]]
+  
+  theme(legend.position = "none") 
+  
+  # Have species bars for additive responses
+  if (!r %in% c("mean_wt","ptob")) {
+    plot<-ggplot(
+      data = plot_df%>% filter(species != "all"),
+      aes(
+        x = wateryear,
+        y = y,
+        fill = species
+      )
+    ) +
+      geom_col(
+        position = "stack",
+        width = 0.8
+      )+
+      scale_fill_manual(
+        values = sp_colors[sp!="all"]
+      ) +
+      geom_line(
+        data = plot_df %>% filter(species == "all"),
+        aes(
+          x = wateryear,
+          y = y
+        ),
+        inherit.aes = F,
+        color = "black",
+        linewidth = 1
+      )+
+      theme_classic()+
+      theme(
+        axis.text.x = element_text(size = 18),  
+        axis.text.y = element_text(size = 18),
+        legend.position = "none",
+        panel.border =  element_rect(color = "black", fill = NA, size = 1)
+      )+
+      xlab("")+
+      ylab("")
+  }else{
+    
+    # Species specific lines for non-additive responses
+    plot <- ggplot(
+      data = plot_df,
+      aes(
+        x = wateryear,
+        y=y, 
+        group = species,
+        fill = species
+      )
+    )+
+      geom_line(
+        aes(
+          color =  species,
+          linewidth = species
+        )
+      )+
+      # geom_ribbon(
+      #   mapping = aes(ymin = production_lwr,ymax =production_upr),
+      #   alpha=0.2,
+      # )+
+      scale_color_manual(values =sp_colors)+
+      scale_fill_manual(values =sp_colors)+
+      scale_linewidth_manual(values = c(2,rep(1,6)))+
+      theme_classic()+
+      theme(
+        axis.text.x = element_text(size = 18),  
+        axis.text.y = element_text(size = 18),
+        legend.position = "none",
+        panel.border =  element_rect(color = "black", fill = NA, size = 1)
+      )+
+      xlab("")+
+      ylab("")
+    
+  }
+  
+  # print(plot)
+  plot
+})
+names(year_list) <- response[response != "ptob"]
+
+year_plot <- cowplot::plot_grid(
+  plotlist = year_list,
+  ncol = 1,
+  align = "v"
+)
+
+ggsave(
+  file.path(
+    plot_dir,
+    "response_trend",
+    "_annual_response.png"
+  ),
+  plot = year_plot,
+  width = 8,
+  # height = 12,
+  height = 15,
   dpi = 300
 )
 
@@ -509,6 +514,7 @@ ggsave(
   ),
   plot = sp_season_plot,
   width = 8,
-  height = 12,
+  # height = 12,
+  height = 15,
   dpi = 300
 )
