@@ -54,60 +54,6 @@ seasonal_prod <- prod_df %>%
     .by = c(wateryear,waterperiod,cum,species)
   )
 
-# # Annual response variables
-# year_prod <- prod_df %>% 
-# 
-#   # Change daily production to interval production
-#   mutate(
-#     across(
-#       .cols = c(
-#         production_mean,production_lwr,production_upr,
-#         ptob
-#         ),
-#       .fns = \(x) x*interval
-#     )
-#   ) %>% 
-#   
-#   # Aggreage production estiate to annual scale
-#   summarise(
-#     across(
-#       .cols = c(
-#         production_mean,production_lwr,production_upr,
-#         ptob,interval
-#         ),
-#       .fns = sum
-#     ),
-#     across(
-#       .cols = c(
-#         sample_den,
-#         biomass_mean,biomass_lwr,biomass_upr
-#       ),
-#       .fns = mean
-#     ),
-#     .by = c(wateryear,region,site,species)
-#   ) %>% 
-#   
-#   # Standardized values to 365 (not all annual intervals are the same)
-#   mutate(
-#     across(
-#       .cols = c(production_mean,production_lwr,production_upr,ptob),
-#       .fns = \(x) x*(365/interval)
-#     )
-#   ) %>% 
-# 
-#   # SUmmarized across all sites
-#   summarize(
-#     across(
-#       .cols = c(
-#         sample_den,
-#         biomass_mean,biomass_lwr,biomass_upr,
-#         production_mean,production_lwr,production_upr,
-#         ptob),
-#       .fns = mean
-#     ),
-#     .by = c(wateryear,species)
-#   )
-
 
 year_prod <- prod_df %>% 
   
@@ -121,7 +67,7 @@ year_prod <- prod_df %>%
     )
   ) %>% 
   
-  # Aggreage production estiate to annual scale
+  # Aggregate production estimate to annual scale
   summarise(
     across(
       .cols = c(
@@ -147,7 +93,7 @@ year_prod <- prod_df %>%
       .cols = c(production_mean,production_lwr,production_upr),
       .fns = \(x) x*(365/interval)
     ),
-    ptob = production_mean/interval_biomass_mean
+    ptob = production_mean/biomass_mean
   ) %>% 
   
   # SUmmarized across all sites
