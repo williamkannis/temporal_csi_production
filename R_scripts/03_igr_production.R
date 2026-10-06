@@ -226,7 +226,19 @@ den_size_df <- bio_df %>%
   # Estimate average density and size across sampling interval
   group_by(site,species) %>% 
   mutate(
+    
+    # Sample event level summaries
     density = n/area,
+    mean_length = case_when(
+      n > 0 ~ length_sum/n,
+      n == 0 ~ 0
+      ),
+    mean_wt = case_when(
+      n > 0 ~ wt_sum/n,
+      n == 0 ~ 0
+      ),
+    
+    # Create sample interval lead values
     across(
       c(n, density, wt_sum, length_sum),
       ~ case_when(
@@ -235,6 +247,8 @@ den_size_df <- bio_df %>%
       ),
       .names = "lead_{.col}"
     ),
+    
+    # Estimate interval means
     interval_n = n+lead_n,
     interval_density = (density+lead_density)/2,
     interval_mean_length = case_when(
@@ -253,6 +267,8 @@ den_size_df <- bio_df %>%
     site,
     cum,
     species,
+    mean_length,
+    mean_wt,
     interval_density,
     interval_mean_length,
     interval_mean_wt
