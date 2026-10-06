@@ -46,7 +46,8 @@ seasonal_prod <- prod_df %>%
         # biomass_mean,biomass_lwr,biomass_upr,
         interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr,
         production_mean,production_lwr,production_upr,
-        ptob
+        ptob,
+        interval_mean_wt
         ),
       .fns = mean
     ),
@@ -132,7 +133,8 @@ year_prod <- prod_df %>%
       .cols = c(
         sample_den,
         interval_biomass_mean,
-        biomass_mean,biomass_lwr,biomass_upr
+        biomass_mean,biomass_lwr,biomass_upr,
+        interval_mean_wt
       ),
       .fns = mean
     ),
@@ -155,7 +157,8 @@ year_prod <- prod_df %>%
         sample_den,
         biomass_mean,biomass_lwr,biomass_upr,
         production_mean,production_lwr,production_upr,
-        ptob),
+        ptob,
+        interval_mean_wt),
       .fns = mean, na.rm=T
     ),
     .by = c(wateryear,species)
@@ -247,21 +250,8 @@ bar_list <- lapply(response, function(r){
     scale_color_manual(values = sp_colors)+
     xlab("")+
     ylab("")
-  print(plot)
+  # print(plot)
   plot
-  
-  # plot_name <- paste0(r,"_barplot.png")
-  # ggsave(
-  #   file.path(
-  #     plot_dir,
-  #     "response_barplot",
-  #     plot_name
-  #     ),
-  #   plot = plot,
-  #   width = 8,
-  #   height = 3,
-  #   dpi = 300
-  # )
 }
 )
 
@@ -275,8 +265,8 @@ barplot <- cowplot::plot_grid(
 ggsave(
   file.path(
     plot_dir,
-    "response_barplot",
-    "_response_barplot.png"
+    "response_trend",
+    "_response_summary.png"
   ),
   plot = barplot,
   width = 8,
@@ -374,7 +364,7 @@ ggsave(
   file.path(
     plot_dir,
     "response_trend",
-    "annual_response.png"
+    "_annual_response.png"
   ),
   plot = year_plot,
   width = 8,
@@ -429,7 +419,7 @@ ggsave(
   file.path(
     plot_dir,
     "response_trend",
-    "season_response.png"
+    "_season_response.png"
   ),
   plot = season_plot,
   width = 8,
@@ -452,7 +442,8 @@ avg_seasonal_prod <- prod_df %>%
         # biomass_mean,biomass_lwr,biomass_upr,
         interval_biomass_mean,interval_biomass_lwr,interval_biomass_upr,
         production_mean,production_lwr,production_upr,
-        ptob),
+        ptob,
+        interval_mean_wt),
       .fns = mean
     ),
     .by = c(waterperiod,species)
@@ -537,7 +528,7 @@ ggsave(
   file.path(
     plot_dir,
     "response_trend",
-    "sp_season_response.png"
+    "_sp_season_response.png"
   ),
   plot = sp_season_plot,
   width = 8,
