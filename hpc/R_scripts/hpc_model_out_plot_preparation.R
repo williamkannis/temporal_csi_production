@@ -424,6 +424,7 @@ theta_pred_raw <- lapply(seq_len(n_iter), function(i) {
     
     # Save prediction and other info in data.frame
     data.frame(
+      iter = i,
       response = response,
       species = sp,
       x_var = vars$x_var,
@@ -461,6 +462,7 @@ message("[", Sys.time(), "] Summarizing theta predictions...")
 
 theta_pred <- theta_pred_raw %>% 
   bind_rows() %>% 
+  select(-iter) %>% 
   group_by(across(-pred)) %>% 
   filter(is.na(z_cat) | z_cat != "mean") %>%   # remove the global effect
   summarize(
@@ -472,7 +474,7 @@ theta_pred <- theta_pred_raw %>%
 
 message("[", Sys.time(), "] Theta predictions summarized")
 
-# Predicted responses (min,med,max CSI)  ---------------------------------------
+# Predicted responses (raw; min,med,max CSI)  ----------------------------------
 
 # Use predicted thetas to predict responses across 1st level predictors. 
 # Predictions are summarized with mean and 95% credible intervals
@@ -506,7 +508,7 @@ message(
 )
 rpred_start <- Sys.time()
 
-response_pred <- lapply(1:nrow(var_combo_response), function(p) {
+response_pred_raw <- lapply(1:nrow(var_combo_response), function(p) {
   
   # Extract indicated variables
   x_v <- var_combo_response[p,2]
@@ -529,9 +531,10 @@ response_pred <- lapply(1:nrow(var_combo_response), function(p) {
   x_raw_range <- seq(min(x_raw),max(x_raw),length.out = pred_len)
   
   # Create predictions for every iteration of gamma predictions
-  pred_list <- lapply(theta_pred_raw, function(df){
+  pred_list <- lapply(seq_along(theta_pred_raw), function(i){
     
     # Extract theta coef
+    df <- theta_pred_raw[[i]]
     theta <- df %>% 
       filter(
         z_var == z_v,
@@ -543,24 +546,22 @@ response_pred <- lapply(1:nrow(var_combo_response), function(p) {
     # exp(x_mat %*% theta)
     
     # Create prediction on log scale
-    x_mat %*% theta
-  })
-  
-  # Prepare output into dataframe with mean and 95CI
-  pred_mat <- do.call(cbind,pred_list)
-  data.frame(
-    species = sp,
-    response = response,
-    x_var = x_v,
-    z_var = z_v,
-    z_cat = z_r,
-    x_range=x_mat[,x_v],
-    x_raw_range = x_raw_range,
-    pred_md = apply(pred_mat, 1, quantile, probs=0.5),
-    pred_up = apply(pred_mat, 1, quantile, probs=0.975),
-    pred_lo = apply(pred_mat, 1, quantile, probs=0.025)
-  )
-}) %>% 
+    pred <- x_mat %*% theta
+    
+    # Prepare output into dataframe
+    data.frame(
+      iter = unique(df$iter),
+      species = sp,
+      response = response,
+      x_var = x_v,
+      z_var = z_v,
+      z_cat = z_r,
+      x_range=x_mat[,x_v],
+      x_raw_range = x_raw_range,
+      pred = pred
+    )
+  }) 
+})%>% 
   bind_rows()
 
 rpred_end <- Sys.time()
@@ -571,6 +572,83 @@ message(
   " minutes"
   )
 
+
+# Predicted responses (summary; min,med,max CSI)  ------------------------------
+
+# Estimate mean and 95% Credible intervals for each response prediction
+message("[", Sys.time(), "] Summarizing response predictions...")
+
+response_pred <- response_pred_raw %>% 
+  select(-iter) %>% 
+  group_by(across(-pred)) %>% 
+  summarize(
+    pred_md = quantile(pred, probs = 0.5, na.rm = TRUE),
+    pred_lo = quantile(pred, probs = 0.025, na.rm = TRUE),
+    pred_up = quantile(pred, probs = 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+ 
+message("[", Sys.time(), "] Response predictions summarized") 
+
+
+# Proportion change predictions  -----------------------------------------------
+
+# Estimate the proportion change of each response across the entire range of 
+# each driver based on predicted responses 
+message("[", Sys.time(), "] Estimating proportion change...")
+
+prop_change <- response_pred_raw %>% 
+  select(-x_raw_range) %>% 
+  
+  # Assign tags for min and max x values
+  group_by(across(-c(x_range,pred))) %>% 
+  mutate(
+    x_cat = case_when(
+      x_range == min(x_range) ~ "min",
+      x_range == max(x_range) ~ "max",
+    )
+  ) %>% 
+  ungroup() %>% 
+  
+  # Add in annual drivers, formatted to match seasonal drivers
+  bind_rows(
+    theta_pred_raw %>% 
+      bind_rows() %>% 
+      filter(x_var == "int") %>% 
+      mutate(
+        x_var = z_var,
+        x_cat = z_cat,
+        z_cat = "mean" # TEMP
+      ) 
+  ) %>% 
+  
+  # Estimate the log proportion change between highest and lowest value of
+  # each driver
+  filter(x_cat %in% c("max", "min")) %>% 
+  select(iter,species,response,z_var,z_cat,x_var,x_cat,pred) %>% 
+  pivot_wider(names_from = x_cat,values_from = pred) %>% 
+  mutate(change = log(exp(max)/exp(min))) %>% 
+  
+  # Summarize with 95% credible intervals
+  select(-iter,-min,-max) %>% 
+  group_by(across(-change)) %>% 
+  summarize(
+    change_md = quantile(change, probs = 0.5, na.rm = TRUE),
+    change_lo = quantile(change, probs = 0.025, na.rm = TRUE),
+    change_up = quantile(change, probs = 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) %>% 
+  
+  # Indicate if credible intervals include zero
+  mutate(
+    overlap0 = case_when(
+      change_lo*change_up >0 ~ F,
+      T ~ T
+    )
+    )
+
+message("[", Sys.time(), "] Proportion change estimated") 
+  
 
 
 # Exporting  ===================================================================
@@ -596,14 +674,16 @@ out_data <- list(
   gamma_coef,
   theta_coef,
   theta_pred,
-  response_pred
+  response_pred,
+  prop_change
 )
 
 name_prefix <- c(
   "coef_gamma",
   "coef_theta",
   "predictions_theta",
-  "predictions_response"
+  "predictions_response",
+  "predictions_prop_change"
 )
 
 lapply(seq_along(out_data), function(x) {
