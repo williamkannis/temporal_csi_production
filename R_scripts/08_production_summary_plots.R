@@ -66,7 +66,7 @@ seasonal_prod <- prod_for %>%
         production_mean,
         ptob
         ),
-      .fns = mean
+      .fns = \(x) mean(x, na.rm = T)
     ),
     .by = c(wateryear,waterperiod,cum,species)
   )
@@ -100,7 +100,7 @@ year_prod <- prod_for %>%
         biomass_mean,
         interval_biomass_mean  # for P:B only
       ),
-      .fns = mean
+      .fns = \(x) mean(x, na.rm = T)
     ),
     .by = c(wateryear,region,site,species)
   ) %>% 
