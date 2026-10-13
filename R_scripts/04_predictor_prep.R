@@ -125,7 +125,7 @@ phy_site_final <- phy_site %>%
   )
 summary(phy_site_final)
 
-# TEMPORARY IMPUTE
+# TEMPORARY IMPUTE - MAYBE CHANGE TO MEAN VALUE
 set.seed(999)
 phy_site_final <- group_impute(
   phy_site_final,
@@ -141,83 +141,103 @@ phy_site_final <- phy_site_final %>% select(-impute)
 
 
 # Site/Year-level predictors ---------------------------------------------------
+
+# phy_site_year <- phy_df %>% 
+#   select(
+#     region,
+#     site,
+#     wateryear,
+#     waterperiod,
+#     wet_sum_365day,
+#     # depth_ave_365day,
+#     # dsldd,
+#     # lastdaydry
+#   ) %>% 
+#   filter(waterperiod == 5) %>% 
+#   group_by(wateryear,region,site) %>% 
+#   summarize(
+#     across(everything(),~mean(.x,na.rm=T)),
+#     .groups = "drop"
+#   ) %>% 
+#   left_join(pisc_df) # %>%
+# # inner_join(samp_for %>% distinct(region,site,wateryear)) 
+
+# Annual hyroperiod
 phy_site_year <- phy_df %>% 
-  select(
-    region,
-    site,
-    wateryear,
-    waterperiod,
-    wet_sum_365day,
-    depth_ave_365day,
-    # dsldd,
-    lastdaydry
-    ) %>% 
   filter(waterperiod == 5) %>% 
   group_by(wateryear,region,site) %>% 
   summarize(
-    across(everything(),~mean(.x,na.rm=T)),
+    across(wet_sum_365day,~mean(.x,na.rm=T)),
     .groups = "drop"
   ) %>% 
+  
+  # Annual predator abundance
   left_join(pisc_df) # %>%
-  # inner_join(samp_for %>% distinct(region,site,wateryear)) 
+ 
 summary(phy_site_year)
 
-
-
-# TEMPORARY IMPUTE
-set.seed(999)
-phy_site_year_impute <- group_impute(
-  phy_site_year,
-  pisc_index,
-  by = c(region)
-) %>% 
-  select(-impute)
-
-# Create lag effects
-phy_site_year_lag <- phy_site_year_impute %>% 
-  group_by(region,site) %>% 
-  mutate(
-    across(
-      .cols = c(wet_sum_365day,depth_ave_365day,lastdaydry,pisc_index),
-      .fns = ~lag(.x,order_by = wateryear),
-      .names = "{.col}_lag"
-    ),
-  ) %>% 
-  ungroup() %>% 
-  inner_join(samp_for %>% distinct(region,site,wateryear)) 
-
 # Check for correlation
-phy_site_year_lag %>% 
+phy_site_year %>% 
   select(-wateryear, -region, -site,  -waterperiod) %>% 
   cor(use = "complete.obs")
 
+
+# # TEMPORARY IMPUTE
+# set.seed(999)
+# phy_site_year_impute <- group_impute(
+#   phy_site_year,
+#   pisc_index,
+#   by = c(region)
+# ) %>% 
+#   select(-impute)
+# 
+# # Create lag effects
+# phy_site_year_lag <- phy_site_year_impute %>% 
+#   group_by(region,site) %>% 
+#   mutate(
+#     across(
+#       .cols = c(wet_sum_365day,depth_ave_365day,lastdaydry,pisc_index),
+#       .fns = ~lag(.x,order_by = wateryear),
+#       .names = "{.col}_lag"
+#     ),
+#   ) %>% 
+#   ungroup() %>% 
+#   inner_join(samp_for %>% distinct(region,site,wateryear)) 
+# 
+# # Check for correlation
+# phy_site_year_lag %>% 
+#   select(-wateryear, -region, -site,  -waterperiod) %>% 
+#   cor(use = "complete.obs")
+
+
 # Site-year PCA  ---------------------------------------------------------------
-
-# Use full pisc and hydrology data sets to conduct PCA on biological and
-# hydrology variables
-# Prepare data input
-pca_input <-phy_site_year_lag %>% 
-  select(-wateryear, -region, -site,  -waterperiod) %>% 
-  select(!contains("lag"))
-
-
-# Run pca
-pca_out <- vegan::rda(pca_input,scale = T)
-
-# Examine results
-summary(pca_out)
-pca_out$CA$v
-plot(pca_out, type = "n") 
-points(pca_out, pch=19, display = "sites") 
-text(pca_out, display = "species", col="blue") 
-
-# Extract pcs that explain atleast 75% of variation and create data.frame
-pca_result <-vegan::scores(pca_out,choices = c(1,2),display = "sites")
-phy_site_year_pca <- cbind(phy_site_year_lag,pca_result)
+# 
+# # Use full pisc and hydrology data sets to conduct PCA on biological and
+# # hydrology variables
+# # Prepare data input
+# pca_input <-phy_site_year_lag %>% 
+#   select(-wateryear, -region, -site,  -waterperiod) %>% 
+#   select(!contains("lag"))
+# 
+# 
+# # Run pca
+# pca_out <- vegan::rda(pca_input,scale = T)
+# 
+# # Examine results
+# summary(pca_out)
+# pca_out$CA$v
+# plot(pca_out, type = "n") 
+# points(pca_out, pch=19, display = "sites") 
+# text(pca_out, display = "species", col="blue") 
+# 
+# # Extract pcs that explain atleast 75% of variation and create data.frame
+# pca_result <-vegan::scores(pca_out,choices = c(1,2),display = "sites")
+# phy_site_year_pca <- cbind(phy_site_year_lag,pca_result)
 
 
 # Region-year level predictors  ------------------------------------------------
-phy_reg_year <- phy_site_year_pca %>% 
+phy_reg_year <- phy_site_year %>% 
+# phy_reg_year <- phy_site_year_pca %>% 
   group_by(region,wateryear) %>% 
   summarise(across(
     c(-site,-waterperiod),
@@ -226,26 +246,36 @@ phy_reg_year <- phy_site_year_pca %>%
     .groups = "drop"
   )
 
+## IMPUTE 95-96 PISC INDEX ##
+# TEMPORARY IMPUTE - MAYBE CHANGE TO MEAN VALUE
+# set.seed(999)
+phy_reg_year_impute <- group_impute(
+  phy_reg_year,
+  pisc_index,
+  by = c(region)
+) %>%
+  select(-impute)
+
 # Check for correlation
-phy_reg_year %>% 
+phy_reg_year_impute %>% 
   select(-wateryear, -region) %>% 
   cor(use = "complete.obs")
 
 
 # Year-level predictors  -------------------------------------------------------
-phy_year <- phy_site_year_pca %>% 
-  group_by(wateryear) %>% 
-  summarise(across(
-    c(-site,-region,-waterperiod),
-    ~mean(.x,na.rm=T)
-    ),
-    .groups = "drop"
-    )
-
-# Check for correlation
-phy_year %>% 
-  select(-wateryear) %>% 
-  cor(use = "complete.obs")
+# phy_year <- phy_site_year_pca %>% 
+#   group_by(wateryear) %>% 
+#   summarise(across(
+#     c(-site,-region,-waterperiod),
+#     ~mean(.x,na.rm=T)
+#     ),
+#     .groups = "drop"
+#     )
+# 
+# # Check for correlation
+# phy_year %>% 
+#   select(-wateryear) %>% 
+#   cor(use = "complete.obs")
 
 
 # Export  ----------------------------------------------------------------------
@@ -253,17 +283,16 @@ saveRDS(
   phy_site_final,
   file.path(export_dir,paste0("phys_site_predictors_",Sys.Date(),".rds"))
   )
+# saveRDS(
+#   phy_site_year_pca, 
+#   file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
+#   )
 saveRDS(
-  phy_site_year_pca, 
-  file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
-  )
-saveRDS(
-  phy_reg_year,
+  phy_reg_year_impute,
   file.path(export_dir,paste0("phys_regionyear_predictors_",Sys.Date(),".rds"))
 )
-saveRDS(
-  phy_year,
-  file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
-)
+# saveRDS(
+#   phy_year,
+#   file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
+# )
 
-## MAYBE DIFFERENCE BETWEEN YEAR AND LAG
