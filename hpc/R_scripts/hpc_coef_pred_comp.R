@@ -25,7 +25,8 @@ name_prefix <- c(
   "coef_gamma",
   "coef_theta",
   "predictions_theta",
-  "predictions_response"
+  "predictions_response",
+  "predictions_prop_change"
 )
 
 ### Extract file names for each file type  ###
