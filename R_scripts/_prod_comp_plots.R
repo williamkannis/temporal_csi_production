@@ -1,3 +1,7 @@
+
+
+plot_dir <- "figures"
+
 pred_prop_change <-data_list$predictions_prop_change
 
 library(dplyr)
@@ -8,10 +12,11 @@ library(ggplot2)
 ## ADD PLOTS WITH TOTA PRODUCTION AND SPECIES
 
 
-
-a <-pred_prop_change %>% 
+# Prepare prop change data for plots
+prop_plot_df <-pred_prop_change %>% 
+  
+  # Filter to only include credible CSIs, or global values in absence of CSI
   filter(
-    response %in% c("interval_mean_wt","interval_density","ptob"),
     x_var %in% c("peri_vol_int","dsldd_int") & 
       z_var == "wet_sum_365day" &
       z_cat == "mean" |
@@ -26,6 +31,8 @@ a <-pred_prop_change %>%
       
       x_var %in% c("wet_sum_365day","pisc_index")
     ) %>% 
+  
+  # Create factor to allow custom plot spacing
   mutate(
     cat = paste(x_var,z_cat,sep = "_"),
     x_pos = case_when(
@@ -42,51 +49,96 @@ a <-pred_prop_change %>%
     )
 
 
+# Separate data into positive and negative
+bar_data <-  prop_plot_df %>% 
+  filter(response %in% c("interval_mean_wt","interval_density","ptob"))
+bar_pos <- bar_data %>% filter(prop_change_md >= 0)
+bar_neg <- bar_data %>% filter(prop_change_md < 0)
+bar_pos$response <- factor(
+  bar_pos$response, 
+  levels = rev(c("interval_density","interval_mean_wt","ptob"))
+  )
+bar_neg$response <- factor(
+  bar_neg$response, 
+  levels = rev(c("interval_density","interval_mean_wt","ptob"))
+  )
+
+# Prepare production data
+prod_data <- prop_plot_df %>% 
+  filter(response == "production_mean")
 net_data <- a %>% 
   group_by(x_pos) %>% 
-  summarise(change_md = sum(change_md))
+  summarise(
+    prop_change_md = sum(prop_change_md),
+    prop_change_up = sum(prop_change_up),
+    prop_change_lo = sum(prop_change_lo)
+  )
 
-
-
-
-# Separate data into positive and negative
-df_pos <- a %>% filter(change_md >= 0)
-df_neg <- a %>% filter(change_md < 0)
-df_pos$response <- factor(df_pos$response, levels = rev(c("interval_density","interval_mean_wt","ptob")))
-df_neg$response <- factor(df_neg$response, levels = rev(c("interval_density","interval_mean_wt","ptob")))
-
+# Create plot
 comp_plot <- ggplot() +
+  
+  # Postive stacked bars
   geom_col(
-    data = df_pos, 
-    aes(x = x_pos, y = change_md, fill = response), 
+    data = bar_pos, 
+    aes(
+      x = x_pos, 
+      y = prop_change_md, 
+      fill = response,
+      alpha = overlap0
+      ), 
     position = "stack" 
     ) +
+  
+  # Negative stacked bars
   geom_col(
-    data = df_neg, 
-    aes(x = x_pos, y = change_md, fill = response), 
+    data = bar_neg, 
+    aes(
+      x = x_pos, 
+      y = prop_change_md, 
+      fill = response,
+      alpha = overlap0
+      ), 
     position = "stack"
     ) +
-  scale_fill_brewer(palette = "Set2") + 
+  
+  # Production mean
+  geom_errorbar(
+    data = prod_data,
+    aes(
+      x = x_pos, 
+      ymin = prop_change_lo, 
+      ymax = prop_change_up,
+      alpha = overlap0
+    ),
+    color = "black",
+    size = .8,
+    width = 0,
+    inherit.aes = F
+  ) +
+  
+  # Production CI
+  geom_point(
+    data = prod_data, 
+    aes(
+      x = x_pos, 
+      y = prop_change_md,
+      alpha = overlap0
+    ),
+    color = "black", 
+    size = 3,
+    inherit.aes = F
+  ) +
+  
+  # Zero line
   geom_hline(
     yintercept = 0, 
     color = "black", 
     linetype = "dashed"
     ) +
-  # geom_errorbar(
-  #   data = net_data, 
-  #   aes(x = x_pos, ymin = change_md, ymax = change_md), 
-  #   color = "black", 
-  #   size = .8, 
-  #   width = 1.8,
-  #   inherit.aes = F
-  #   ) +
-  geom_point(
-    data = net_data, 
-    aes(x = x_pos, y = change_md),
-    color = "black", 
-    size = 3,
-    inherit.aes = F
-    ) +
+  
+  # Plot aestetics
+  scale_fill_brewer(palette = "Set2") + 
+  scale_alpha_manual(values = c("TRUE" = 0.3, "FALSE" = 1.0))+
   ylab("Proportion change")+
   theme_classic()+
   theme(
@@ -99,6 +151,7 @@ comp_plot <- ggplot() +
     panel.border =  element_rect(color = "black", fill = NA, size = 1),
   )
 
+# Export plot
 ggsave(
   file.path(
     plot_dir,
