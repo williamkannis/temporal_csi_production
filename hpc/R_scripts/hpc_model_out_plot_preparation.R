@@ -595,7 +595,7 @@ message("[", Sys.time(), "] Response predictions summarized")
 
 # Estimate the proportion change of each response across the entire range of 
 # each driver based on predicted responses 
-message("[", Sys.time(), "] Estimating proportion change...")
+message("[", Sys.time(), "] Estimating proportion change and difference...")
 
 prop_change <- response_pred_raw %>% 
   select(-x_raw_range) %>% 
@@ -622,20 +622,29 @@ prop_change <- response_pred_raw %>%
       ) 
   ) %>% 
   
-  # Estimate the log proportion change between highest and lowest value of
-  # each driver
+  # Estimate the log proportion change and differnce between highest and lowest 
+  # value of each driver
   filter(x_cat %in% c("max", "min")) %>% 
   select(iter,species,response,z_var,z_cat,x_var,x_cat,pred) %>% 
   pivot_wider(names_from = x_cat,values_from = pred) %>% 
-  mutate(change = log(exp(max)/exp(min))) %>% 
+  mutate(
+    prop_change = log(exp(max)/exp(min)),
+    diff = exp(max)-exp(min)
+    ) %>% 
   
   # Summarize with 95% credible intervals
   select(-iter,-min,-max) %>% 
-  group_by(across(-change)) %>% 
+  group_by(across(-c(prop_change,diff))) %>% 
   summarize(
-    change_md = quantile(change, probs = 0.5, na.rm = TRUE),
-    change_lo = quantile(change, probs = 0.025, na.rm = TRUE),
-    change_up = quantile(change, probs = 0.975, na.rm = TRUE),
+    across(
+      .cols = c(prop_change, diff),
+      .fns = list(
+        md = ~ quantile(.x, probs = 0.500, na.rm = TRUE),
+        lo = ~ quantile(.x, probs = 0.025, na.rm = TRUE),
+        up = ~ quantile(.x, probs = 0.975, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
     .groups = "drop"
   ) %>% 
   
@@ -647,7 +656,7 @@ prop_change <- response_pred_raw %>%
     )
     )
 
-message("[", Sys.time(), "] Proportion change estimated") 
+message("[", Sys.time(), "] Proportion change and difference estimated") 
   
 
 
