@@ -20,7 +20,6 @@ rm(list = ls())
 # Load in packages
 library(dplyr)
 library(stringr)
-devtools::load_all("~/Documents/work/R packages/secProd")
 
 # directories
 data_dir <- file.path(
