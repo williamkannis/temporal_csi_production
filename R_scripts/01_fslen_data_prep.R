@@ -29,10 +29,13 @@ data_dir <- file.path(
 input_dir <- "input_data"
 
 # Data
-len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-07-09.rds"))
+len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-11-03.rds"))
+
+# CHANGE IMPUTE METHOD
+# FILTER OUT DATA PRIOR TO 1997
 
 
-# Data preperation  ------------------------------------------------------------
+# Data preparation  ------------------------------------------------------------
 
 # For this manuscript we will only focus on the 6 most abundant species:
 sp <- c(
@@ -45,13 +48,17 @@ sp <- c(
   "NOFISH"  # include sites with no fish as true zeros
 )
 len_filtered <- len_df %>% 
-  filter(species %in% sp)
+  filter(
+    species %in% sp,
+    wateryear > 1996  
+    )
 
 
 # Length summary  --------------------------------------------------------------
 
 # Proportion of data made up by big 6
 len_df %>% 
+  filter(wateryear > 1996) %>% 
   mutate(
     focal = case_when(
       species %in% sp ~ T,
@@ -64,8 +71,39 @@ len_df %>%
     prop_focal = 100*n_focal/tot
   )
 
-# Missing lengths
+
 len_df %>% 
+  filter(
+    wateryear > 1996,
+    !species %in% c(sp,"NOFISH")
+    ) %>% 
+  distinct(site,cum) %>% 
+  nrow()
+
+# Percent of nonfocal species at sites
+prop_focal <-len_df %>% 
+  filter(wateryear > 1996) %>% 
+  mutate(
+    type = case_when(
+      species %in% sp[-7] ~ "focal",
+      species == "NOFISH" ~ "nofish",
+      T ~ "rare"
+    )
+  ) %>% 
+  group_by(site,cum) %>% 
+  summarise(
+    n_focal = sum(type=="focal"),
+    n_rare = sum(type == "rare"),
+    n = n(),
+    prop_rare = n_rare/n
+  )
+
+median(prop_focal$prop_rare)
+1-sum(prop_focal$prop_rare <.5)/nrow(prop_focal)
+
+
+# Missing lengths
+len_filtered %>% 
   summarize(
     tot = n(),
     n_missing= length(length[is.na(length)]),
@@ -85,70 +123,39 @@ len_filtered %>%
 
 
 # Length imputation  -----------------------------------------------------------
-set.seed(999)
 
-# First impute missing lengths for site and sampling period combinations with
-# sufficient individuals of a species
-len_tier1 <- group_impute(
-  data = len_filtered,
-  column = length,
-  by = c(species,site,cum),
-  limit = 40,
-  impute.tag = "tier1") 
+# Find median values for each species and season
+miss_meds <- len_filtered %>% 
+  filter(species != "NOFISH") %>% 
+  group_by(species,cum) %>% 
+  summarise(
+    length_median = median(length,na.rm = T)
+  )
 
-# Next impute missing lengths using entire sampling periods for site/periods  
-# with a insufficient number of individuals
-len_tier2 <- group_impute(
-  data = len_tier1 %>% filter(is.na(impute)),
-  column = length,
-  by = c(species,cum),
-  limit = 40,
-  impute.tag = "tier2")
-
-# Finally, impute missing lengths using data for the entire species if the 
-# sampling period has insufficient sample sizes
-len_tier3 <- group_impute(
-  data = len_tier2 %>% filter(is.na(impute)),
-  column = length,
-  by = c(species),
-  limit = 40,
-  impute.tag = "tier3")
-
-# Consolidate the imputation tiers  to one data frame
-len_impute <- bind_rows(
-  len_tier1 %>% filter(!is.na(impute)),
-  len_tier2 %>% filter(!is.na(impute)),
-  len_tier3 %>% filter(!is.na(impute))
-) %>% 
-  mutate(old_length = NA)
-
-# Replace missing data with imputed data
-len_final <- len_filtered %>% 
-  anti_join(
-    len_impute,
-    by = join_by(
-      cum,
-      region,
-      site,
-      plot,
-      throw,
-      species,
-      length == old_length
+# Replace missing values with seasonal medians
+len_impute <- len_filtered %>% 
+  left_join(miss_meds) %>% 
+  mutate(
+    impute = case_when(
+      is.na(length) ~ T,
+      T ~ F
+    ),
+    length = case_when(
+      is.na(length) ~ length_median,
+      T ~ length
     )
   ) %>% 
-  bind_rows(len_impute) %>% 
-  select(-old_length)
+  select(-length_median)
+
+# Did all NAs get imputed?
+len_impute %>% 
+  filter(is.na(length))
+summary(len_impute)
 
 # check that number of rows is the same
-nrow(len_final) == nrow(len_filtered)
-
-# Imputation summary
-len_final %>% 
-  filter(!is.na(impute)) %>% 
-  group_by(species,impute) %>% 
-  summarize(n = n())
+nrow(len_impute) == nrow(len_filtered)
 
 
 # Export  ----------------------------------------------------------------------
 file_name <- paste0("fslen_imputed_",Sys.Date(),".rds")
-saveRDS(len_final,file.path(input_dir,file_name))
+saveRDS(len_impute,file.path(input_dir,file_name))
