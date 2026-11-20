@@ -1,5 +1,5 @@
 message("============================================================")
-message(".R")
+message("Starting hpc_model_out_prep.R")
 message("Start time: ", Sys.time())
 message("Slurm job ID: ", Sys.getenv("SLURM_JOB_ID"))
 message("Slurm array job ID: ", Sys.getenv("SLURM_ARRAY_JOB_ID"))
