@@ -29,7 +29,7 @@ plot_dir <- "figures"
 prod_df <- 
   readRDS(file.path(prod_dir,"fsprod_formatted.rds"))
 len_df <-
-  readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
+  readRDS(file.path(input_dir,"fslen_imputed_2026-11-16.rds"))
 
 
 # Data preparation  ------------------------------------------------------------
@@ -142,18 +142,18 @@ sp_colors <-
   c("black","#b5a331","#339d38","#c26a77","#8c6d3f","#2f2585","#2b695c")
 
 annual_response <- c(
+  "ptob",
   "mean_wt",
   "sample_den",
   "biomass_mean",
-  "production_mean",
-  "ptob"
+  "production_mean"
   )
 response <- c(
+  "ptob",
   "interval_mean_wt",
   "interval_density",
   "interval_biomass_mean",
-  "production_mean",
-  "ptob"
+  "production_mean"
   )
 
 
