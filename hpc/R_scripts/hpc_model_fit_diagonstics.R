@@ -24,7 +24,6 @@ message("[", Sys.time(), "] Packages loaded")
 
 ### Directories  ###
 out_dir <- "hpc/stan_outputs"
-out_dir <- "stan_outputs"  # TEMP DELETE
 data_dir <- "hpc/data"
 diag_dir <- "hpc/diagnostics"
 
