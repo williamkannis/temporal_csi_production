@@ -137,6 +137,7 @@ message("[", Sys.time(), "] Stan model ready")
 n_iter <- 2000
 n_warm <- 1000
 chains <- 4
+
 message("------------------------------------------------------------")
 message(paste0("[", Sys.time(), "] Starting Stan sampling for ", mod_name))
 message(paste0("Chains: ", chains))
@@ -152,6 +153,7 @@ out <- mod$sample(
   iter_warmup = n_warm,
   chains = chains,
   parallel_chains = 4,
+  adapt_delta = 0.95,
   init = 0.5
 )
 
@@ -165,7 +167,7 @@ message("Sampling time: ", round(
 message("------------------------------------------------------------")
 
 
-# Diagonstics  -----------------------------------------------------------------
+# Diagnostics  -----------------------------------------------------------------
 
 # Check for convergence or sampling issues
 message("[", Sys.time(), "] Checking convergence and sampling diagnostics...")
