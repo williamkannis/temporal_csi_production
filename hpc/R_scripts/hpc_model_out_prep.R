@@ -40,9 +40,7 @@ message("============================================================")
 ### Load in command arguments  ###
 message("[", Sys.time(), "] Load in command arguments... ")
 
-arg <- as.numeric(commandArgs(trailingOnly = TRUE))
-# arg <- 2  ### REMOVE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#!#!#!#!#!#!#!#!!#!#!#!#!!#
-#!!!!!#!!!!!!!!#!!!!!!!!#!!!!!!!!!!!!#!#!!!#!
+arg <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 
 if (length(arg) < 1) {
   stop("Missing required arguments")
@@ -718,8 +716,10 @@ lapply(seq_along(out_data), function(x) {
 message("[", Sys.time(), "] Exports finished")
 
 
+# End of script  ===============================================================
+
 message("============================================================")
-message("Finished .R run")
+message("Finished hpc_model_out_prep.R run")
 message("End time: ", Sys.time())
 message("============================================================")
 
