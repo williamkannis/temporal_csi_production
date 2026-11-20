@@ -30,9 +30,6 @@ input_dir <- "input_data"
 # Data
 len_df <- readRDS(file.path(data_dir,"fslen_cleaned_2026-11-03.rds"))
 
-# CHANGE IMPUTE METHOD
-# FILTER OUT DATA PRIOR TO 1997
-
 
 # Data preparation  ------------------------------------------------------------
 
@@ -97,9 +94,16 @@ prop_focal <-len_df %>%
     prop_rare = n_rare/n
   )
 
+prop_focal %>% 
+  filter(prop_rare == 1) %>% 
+  nrow()
+# No rare species made up an entire sites density. All missing sites after
+#  filtering are truly missing, rather than just missing the focal species
+
 median(prop_focal$prop_rare)
 1-sum(prop_focal$prop_rare <.5)/nrow(prop_focal)
-
+# The median sample has  ~7% of its density made up by rare species
+# and only ~3% of samples have rare specis making up half its density
 
 # Missing lengths
 len_filtered %>% 
@@ -158,3 +162,4 @@ nrow(len_impute) == nrow(len_filtered)
 # Export  ----------------------------------------------------------------------
 file_name <- paste0("fslen_imputed_",Sys.Date(),".rds")
 saveRDS(len_impute,file.path(input_dir,file_name))
+
