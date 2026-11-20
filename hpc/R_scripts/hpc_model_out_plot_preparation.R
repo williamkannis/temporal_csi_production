@@ -257,7 +257,7 @@ message("[", Sys.time(), "] Gamma-varaible name bridge created")
 message("[", Sys.time(), "] Summarizing Theta coefficients...")
 
 theta_coef <- out$summary(
-  "beta",  # CHANGE TO THETA IN MODEL FOR FINAL RUN
+  "theta",
   mean,
   quantile, 
   .args = list(probs = c(0.025, 0.975))
@@ -324,7 +324,15 @@ theta_coef <- out$summary(
     ), 
     by = "y_idx"
     ) %>% 
-  select(-x_idx,-r_idx,-y_idx)
+  select(-x_idx,-r_idx,-y_idx) %>% 
+
+  # Add second level predictor data
+  mutate(wateryear = as.numeric(wateryear)) %>% 
+  left_join(
+    z_data_raw,
+    by = join_by(wateryear,region)
+    )
+
 
 message("[", Sys.time(), "] Theta coef summary created")
 
@@ -650,8 +658,12 @@ prop_change <- response_pred_raw %>%
   
   # Indicate if credible intervals include zero
   mutate(
-    overlap0 = case_when(
-      change_lo*change_up >0 ~ F,
+    prop_change_overlap0 = case_when(
+      prop_change_lo*prop_change_up >0 ~ F,
+      T ~ T
+    ),
+    diff_overlap0 = case_when(
+      diff_lo*diff_up >0 ~ F,
       T ~ T
     )
     )
