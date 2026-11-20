@@ -25,13 +25,13 @@ export_dir <- "hpc/data"
 
 # Data
 den_size_df <- 
-  readRDS(file.path(input_dir,"fs_densize.rds"))
+  readRDS(file.path(input_dir,"fs_densize_2026-11-18.rds"))
 prod_df <- 
-  readRDS(file.path(input_dir,"fsprod_igr_2026-07-13.rds"))
+  readRDS(file.path(input_dir,"fsprod_igr_2026-11-18.rds"))
 phy_site <- 
-  readRDS(file.path(input_dir,"phys_site_predictors_2026-08-17.rds"))
+  readRDS(file.path(input_dir,"phys_site_predictors_2026-11-18.rds"))
 phy_reg_year <- 
-  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-08-17.rds"))
+  readRDS(file.path(input_dir,"phys_regionyear_predictors_2026-11-18.rds"))
 
 
 # Prep data  -------------------------------------------------------------------
@@ -65,12 +65,12 @@ prod_all <- prod_for %>%
 prod_final <- phy_site %>% 
   distinct(wateryear,region,site,cum) %>% 
   filter(wateryear != 2024) %>%   ## TEMPORARY ASK NATE FOR NEWEST SHARK RIVER DATA (2025)
-  # filter(wateryear !=1995) %>%  ## TEMP ASK JOEL FOR LAG DATA FOR THIS YEAR
   left_join(prod_all, by = join_by(site,cum)) %>% 
   filter(!is.na(production_mean)) 
   
 samp_df <- prod_final %>% 
-  # transform response varibales to improv convergence
+  
+  # transform response variables to improve convergence
   mutate(
     interval_mean_wt = interval_mean_wt*1000,
     production_mean = production_mean*1000,
@@ -82,16 +82,12 @@ samp_df <- prod_final %>%
 cb <- expand.grid(
   unique(samp_df$species),
   c(
+    "ptob",
     "interval_density", 
     "interval_mean_wt", 
-    "interval_mean_length", 
     "interval_biomass_mean", 
-    "production_mean",
-    "ptob"
+    "production_mean"
     )
-  # c("production_mean","biomass_mean","ptob","sample_den")
-  # c("production_mean","biomass_mean")
-  # c("ptob")
 )
 n_cb <- nrow(cb)
 
@@ -192,7 +188,6 @@ input_list <- lapply(1:n_cb, function(i){
 
   ## Stan list  ##
   list(
-    # M = 60,
     N = nrow(site_df),
     `T` = n_distinct(site_df$year_id),
     S = n_distinct(site_df$site_id),
