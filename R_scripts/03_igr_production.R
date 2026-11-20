@@ -10,7 +10,6 @@
 
 # DESCRIPTION: 
 
-## !!  RERUN PRODUCTION WITH NEW LEADED GROUP IDS  !! ##
 
 
 # Housekeeping  ----------------------------------------------------------------
@@ -19,6 +18,7 @@ rm(list = ls())
 # Load in packages
 library(dplyr)
 library(tidyr)
+library(purrr)
 
 # Packages under development (switch to github for publication)
 devtools::load_all("~/Documents/work/R packages/growthstack")
@@ -30,13 +30,13 @@ export_dir <- "prod_data"
 
 # Growth model directories
 grow_dir <- 
-  "~/Documents/Work/Everglades post-doc/Data analysis/growth curves/outputs"
+  "~/Documents/Work/archived_code/growth curves/outputs"
 stack_dir <- file.path(grow_dir,"loo_outputs")
 mod_dir <- file.path(grow_dir,"stan_outputs")
 
 # Data
-len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
-hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-07-09.rds"))
+len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-11-16.rds"))
+hyd_df <- readRDS(file.path(input_dir,"hydr_class_annual_2026-11-16.rds"))
 wt_df <- read.csv(file.path(input_dir,"length_weight_parameters.csv"))
 stack_list <- readRDS(file.path(stack_dir,"_cat-stack_wt_out.rds"))
 stackJ <- readRDS(file.path(stack_dir,"stack_wt_out.rds"))["JORFLO"]
@@ -87,8 +87,6 @@ interval_df <- samp_df %>%
   filter(!is.na(interval)) %>% 
   distinct(group_id,interval)
 
-
-
 # Estimate biomass for each fish and attach sampling info
 bio_df <- len_df %>% 
   left_join(
@@ -112,17 +110,18 @@ bio_df <- len_df %>%
 
 # Species-specific production estimates  ---------------------------------------
 
-# JORFLO has no group speficic growth esitmates and stacking wts are contained 
-# in seperate file. Adds these to main stacking weigth list
+# JORFLO has no group specific growth estimates and stacking wts are contained 
+# in separate file. Adds these to main stacking weight list
 stack_list <- c(stack_list,stackJ)
 
 # Production input settings
 sp <- names(stack_list)
 cohort <- 30
 growth_iter <- 10000
-prod_iter <- 10000
+prod_iter <- 1000
 
-prod_list2 <- lapply(sp, function(s){
+start<- Sys.time()
+prod_list <- lapply(sp, function(s){
   
   # Filter all data for one species
   samp <- samp_df
@@ -167,23 +166,34 @@ prod_list2 <- lapply(sp, function(s){
   )
   
   # Species specific production
-  production(
+production(
+    sp.name = s,
     method = "igr",
     sample = samp,
     biomass = bio,
     growth = growth_post, 
-    class.type = "size",
+    class.type = "length",
     class.size = 1,
     bio.boot = T, 
     growth.boot = T,
     iter = prod_iter,
-    return.raw = F,
+    return.raw = T,
     parallel = T,
     mc.cores = 10
-  ) %>% 
-    mutate(species = s)
+  ) 
+
+
 })
-prod_df <- bind_rows(prod_list)
+Sys.time()- start
+
+# Extract and combine the summarized production values across species
+prod_list_t <- transpose(prod_list)
+prod_df <- bind_rows(prod_list_t$production_summary)
+
+# Extract and combine the raw bootstrap iterations
+prod_raw <- prod_list_t$raw %>% 
+  list_transpose() %>%
+  map(~ bind_rows(.x, .id = "species"))
 
 
 # Species-specific Interval density and mean size  -----------------------------
@@ -286,7 +296,9 @@ prod_file <- paste0("fsprod_igr_",Sys.Date(),".rds")
 saveRDS(prod_df,file.path(export_dir,prod_file))
 
 # Interval density and size
-den_size_file <- 'fs_densize.rds'
+den_size_file <- paste0("fs_densize_",Sys.Date(),".rds")
 saveRDS(den_size_df,file.path(export_dir,den_size_file))
 
-
+# Raw production
+raw_file <- paste0("fs_rawprod_igr_",Sys.Date(),".rds")
+saveRDS(prod_raw,file.path(export_dir,raw_file))
