@@ -27,19 +27,20 @@ plot_dir <- "figures"
 
 # Load in data
 phy_site <- 
-  readRDS(file.path(prod_dir,"phys_site_predictors_2026-08-17.rds"))
+  readRDS(file.path(prod_dir,"phys_site_predictors_2026-11-18.rds"))
 phy_reg_year <- 
-  readRDS(file.path(prod_dir,"phys_regionyear_predictors_2026-08-17.rds"))
+  readRDS(file.path(prod_dir,"phys_regionyear_predictors_2026-11-18.rds"))
 prod_df <- 
   readRDS(file.path(prod_dir,"fsprod_formatted.rds"))
 len_df <-
-  readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
+  readRDS(file.path(input_dir,"fslen_imputed_2026-11-16.rds"))
 
 
 # Data preparation  ------------------------------------------------------------
 
 # seasonal drivers - annual variation
 seasonal_drivers_year <- phy_site %>% 
+  filter(wateryear < 2024) %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
   right_join(prod_df %>% distinct(cum,site)) %>% 
   left_join(phy_reg_year) %>% 
@@ -63,6 +64,7 @@ seasonal_drivers_year <- phy_site %>%
 
 # seasonal drivers - site variation
 seasonal_drivers_site <- phy_site %>% 
+  filter(wateryear < 2024) %>% 
   left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
   right_join(prod_df %>% distinct(cum,site)) %>% 
   
@@ -82,7 +84,31 @@ seasonal_drivers_site <- phy_site %>%
 
 # Annual drivers
 annual_drivers <-  phy_reg_year %>% 
+  filter(wateryear < 2024) %>% 
   right_join(prod_df %>% distinct(region,wateryear))
+
+
+seasonal_driver_annual <- phy_site %>% 
+  filter(wateryear < 2024) %>% 
+  left_join(len_df %>% distinct(cum,period,waterperiod)) %>% 
+  right_join(prod_df %>% distinct(cum,site)) %>% 
+  # left_join(phy_reg_year) %>% 
+  
+  # Aggregate to sampling interval
+  summarise(
+    across(
+      .cols = c(
+        depth,
+        dsldd_int,
+        plt_cov_int,
+        peri_vol_int,
+        # wet_sum_365day,
+        # pisc_index
+      ),
+      .fns = \(x) mean(x, na.rm = TRUE)
+    ),
+    .by = c(wateryear,region)
+  )
   
 
 # Driver seasonal plot ---------------------------------------------------------
@@ -117,12 +143,12 @@ season_year_list <- lapply(drivers,function(r){
   )+
     ylim(0,max_y)+
     geom_line(aes(color = wateryear),linewidth = 1.5)+
-    # scale_color_gradientn(
-    #   colours = c("#5E3C99", "#CC79A7", "#E66101")
-    # )+
     scale_color_gradientn(
-      colours = c("#FFD700","#1ABC9C","#1B4F72")
+      colours = c("#5E3C99", "#CC79A7", "#E66101")
     )+
+    # scale_color_gradientn(
+    #   colours = c("#FFD700","#1ABC9C","#1B4F72")
+    # )+
     theme_classic()+
     theme(
       axis.text.x = element_blank(),  
@@ -271,3 +297,71 @@ ggsave(
   height = 6,
   dpi = 300
 )
+
+
+# Inter-annual response plots---------------------------------------------------
+
+BLANK_list <- lapply(drivers, function(r){
+  plot_df <-seasonal_driver_annual
+  plot_df$y <- plot_df[[r]]
+  
+  theme(legend.position = "none") 
+  
+  plot<-ggplot(
+    data = plot_df,
+    aes(
+      x = wateryear,
+      y=y, 
+      group = region,
+      fill = region
+    )
+  )+
+    geom_line(
+      aes(
+        color =  region,
+        linewidth = region
+      )
+    )+
+    scale_color_manual(values = c(
+      "TSL" = "#FFD700",
+      "SRS" = "#1ABC9C",
+      "WCA" = "#1B4F72")
+    )+
+    scale_fill_manual(values = c(
+      "TSL" = "#FFD700",
+      "SRS" = "#1ABC9C",
+      "WCA" = "#1B4F72")
+    )+
+    scale_linewidth_manual(values = c(2,rep(1,6)))+
+    theme_classic()+
+    theme(
+      axis.text.x = element_text(size = 18),  
+      axis.text.y = element_text(size = 18),
+      legend.position = "none",
+      panel.border =  element_rect(color = "black", fill = NA, size = 1)
+    )+
+    xlab("")+
+    ylab("")
+  # print(plot)
+  plot
+})
+names(BLANK_list) <- drivers
+
+
+cowplot::plot_grid(
+  plotlist = BLANK_list,
+  ncol = 1,
+  align = "v"
+)
+
+# ggsave(
+#   file.path(
+#     plot_dir,
+#     "driver_trend",
+#     "_annual_driver.png"
+#   ),
+#   plot = year_plot,
+#   width = 8,
+#   height = 6,
+#   dpi = 300
+# )
