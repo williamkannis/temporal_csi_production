@@ -1,9 +1,22 @@
+message("============================================================")
+message("Start hpc_model_fit_diagonstics.R")
+message("Start time: ", Sys.time())
+message("Slurm job ID: ", Sys.getenv("SLURM_JOB_ID"))
+message("Slurm array job ID: ", Sys.getenv("SLURM_ARRAY_JOB_ID"))
+message("Slurm array task ID: ", Sys.getenv("SLURM_ARRAY_TASK_ID"))
+message("============================================================")
+
+# For use with SBATCH on Slurm Scheduler. 
+# DO NO RUN OUTSIDE OF SLURM.
+
 
 # House keeping  ---------------------------------------------------------------
 rm(list = ls())
 
-# Packages
+# Load custom functions
+library(cmdstanr)
 
+source("R_scripts/hpc_diag_functions.R")
 
 # Directories
 out_dir <- "stan_outputs"
@@ -11,9 +24,9 @@ data_dir <- "hpc/data"
 
 
 # Load in model out puts
-out_files <- list.files(out_dir,"M100.rds$")
+out_files <- list.files(out_dir, 'mean_wt')
 out_list <- lapply(out_files, function(x) readRDS(file.path(out_dir,x)))
-names(out_list) <- gsub("_stan_out_M100.rds","",out_files)
+names(out_list) <- out_files
 
 # load in data
 data_files <- list.files(data_dir)
