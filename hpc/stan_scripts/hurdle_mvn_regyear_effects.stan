@@ -1,3 +1,5 @@
+//  CHANGE MODEL SYMBOLS TO MATCH MANUSCRIPT
+
 data {
   int<lower=0> N;                     // number of data items
   int<lower=1> T;                     // number of years
@@ -18,33 +20,33 @@ data {
 
 parameters {
   matrix[L,K] gamma;                  // year-level effect coefficents
-  vector[H] beta_hurdle;              // effect coefficents for hurdle
-  array[R] matrix[K,T] beta_raw;      // standardized year-level deviations
+  vector[H] delta;              // effect coefficents for hurdle
+  array[R] matrix[K,T] theta_raw;      // standardized year-level deviations
   vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
-  vector<lower=0>[K] tau;             // year-level effect coefficents error
-  real<lower=0> tau_s;                // site random effect error
-  // vector<lower=0>[R] tau_s;           // site random effect error
-  real<lower=0> shape;                // Gamma shape parameter
+  vector<lower=0>[K] sigma;             // year-level effect coefficents error
+  real<lower=0> tau;                // site random effect error
+  // vector<lower=0>[R] tau;           // site random effect error
+  real<lower=0> alpha;                // Gamma shape parameter
 
 }
 
 transformed parameters {
 
   // year-level MVN random effects - noncentered parametrization
-  array[R] matrix[K,T] beta;          // year_region-level effect coefficents
+  array[R] matrix[K,T] theta;          // year_region-level effect coefficents
   for (r in 1:R){
-    matrix[K,T] beta_error;
-    beta_error = diag_pre_multiply(tau,L_omega)*beta_raw[r];
-    beta[r] = (z[r] * gamma)' + beta_error;
+    matrix[K,T] theta_error;
+    theta_error = diag_pre_multiply(sigma,L_omega)*theta_raw[r];
+    theta[r] = (z[r] * gamma)' + theta_error;
   }
   
   // site-level random effects - noncentered parametrization
-  vector[S] st_eff = tau_s * st_raw;
-  // vector[S] st_eff = tau_s[rg] .* st_raw;
+  vector[S] st_eff = tau * st_raw;
+  // vector[S] st_eff = tau[rg] .* st_raw;
   
   // hurdle parameters 
-  vector[N] logit_hu = x_hurdle * beta_hurdle;
+  vector[N] logit_hu = x_hurdle * delta;
   vector[N] hu = inv_logit(logit_hu);
   
   // Mu vector
@@ -54,7 +56,7 @@ transformed parameters {
     int t = yr[n];
     int s = st[n];
     int r = rg[s];
-    eta[n] = x[n] * beta[r][,t] + st_eff[s];
+    eta[n] = x[n] * theta[r][,t] + st_eff[s];
   }
   vector[N] mu = exp(eta);
     
@@ -64,20 +66,20 @@ model {
 
   // Hyperpriors
   to_vector(gamma) ~ normal(0, 1);
-  beta_hurdle ~ normal(0, 5);
+  delta ~ normal(0, 5);
 
   for (r in 1:R)
-    to_vector(beta_raw[r]) ~ std_normal();
+    to_vector(theta_raw[r]) ~ std_normal();
 
   st_raw ~ std_normal();
 
   L_omega ~ lkj_corr_cholesky(2);
 
+  sigma ~ normal(0, 1);
   tau ~ normal(0, 1);
-  tau_s ~ normal(0, 1);
 
-  shape ~ exponential(1);
-  // shape ~cauchy(0,.5);
+  alpha ~ exponential(1);
+  // alpha ~cauchy(0,.5);
 
   // Likelihood
   for (n in 1:N) {
@@ -92,12 +94,12 @@ model {
       // int t = yr[n];
       // int s = st[n];
       // int r = rg[s];
-      // real eta = x[n] * beta[r][,t] + st_eff[s];
+      // real eta = x[n] * theta[r][,t] + st_eff[s];
       // real mu = exp(eta);
       
       target += bernoulli_lpmf(0 | hu[n]);
-      // target += gamma_lpdf(y[n] | shape, shape / mu);
-      target += gamma_lpdf(y[n] | shape, shape / mu[n]);
+      // target += gamma_lpdf(y[n] | alpha, alpha / mu);
+      target += gamma_lpdf(y[n] | alpha, alpha / mu[n]);
     
     }
   }
@@ -121,7 +123,7 @@ generated quantities {
     } else {
 
       log_lik[n] = bernoulli_lpmf(0 | hu[n]) +
-        gamma_lpdf(y[n] | shape, shape / mu[n]);
+        gamma_lpdf(y[n] | alpha, alpha / mu[n]);
 
     }
 
@@ -141,7 +143,7 @@ generated quantities {
 
       pearson_residual_gamma[n] =
         (y[n] - mu[n]) /
-        (mu[n] / sqrt(shape));
+        (mu[n] / sqrt(alpha));
 
     } else {
 
@@ -153,8 +155,8 @@ generated quantities {
       y_rep[n] = 0;
     } else {
       y_rep[n] = gamma_rng(
-        shape,
-        shape / mu[n]
+        alpha,
+        alpha / mu[n]
       );
     }
   }

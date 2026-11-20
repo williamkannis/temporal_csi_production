@@ -36,9 +36,9 @@ gamma <- list(  # first value in each vector is beta intercept
   c(.3,.08,-0.1),
   c(-.04,-.3,.1),
   c(.1,.1,0.02))
-tau_T <- c(.41,.15,.46,.21,.21)
-tau_S <- .69
-tau_S <- c(.69, .3, .1)
+sigma <- c(.41,.15,.46,.21,.21)
+tau <- .69
+# tau <- c(.69, .3, .1)
 
 power <- 1.5
 phi <- 8
@@ -56,7 +56,7 @@ cor.mat = matrix(
   4
 )
 cor.mat = rcorrmatrix(d = 5)
-cov.mat <-diag(tau_T) %*% cor.mat  %*%  diag(tau_T)
+cov.mat <-diag(sigma) %*% cor.mat  %*%  diag(sigma)
 
 
 # number of predictors
@@ -94,8 +94,8 @@ beta <- do.call(
 )
 
 # Create site error
-site_error <- rnorm(K_S,0,tau_S)
-site_error <- sapply(1:K_S, function(s) rnorm(1,0,tau_S[group_r[s]]))
+site_error <- rnorm(K_S,0,tau)
+# site_error <- sapply(1:K_S, function(s) rnorm(1,0,tau[group_r[s]]))
 site_error_full <- site_error[group_s]
 
 # Simulate response data
@@ -148,7 +148,7 @@ out <- mod$sample(
   iter_sampling = 2000,
   iter_warmup = 1000,
   chains = 4,
-  parallel_chains = 4,
+  parallel_chains = 2,
   init = 0.5
 )
 
@@ -156,10 +156,10 @@ out110$summary()
 out110$diagnostic_summary()
 
  
-real <- c(do.call(cbind,gamma),tau_T,tau_S,phi,power)
-# real <- c(do.call(cbind,gamma),tau_T,tau_S,shape)
+real <- c(do.call(cbind,gamma),sigma,tau,phi,power)
+# real <- c(do.call(cbind,gamma),sigma,tau,shape)
 means <- out$summary(
-  c("gamma","tau","tau_s","phi","theta"),
+  c("gamma","sigma","tau","phi","power"),
   "mean",
   quantile, 
   .args = list(probs = c(0.025, 0.975))
@@ -181,13 +181,13 @@ cbind(means,real) %>%
 # )
 # new version ran in 1106.94 secs
 # new version ran in 1790.61 secs
-print(out,pars = c("gamma","tau","tau_s","phi","theta"))
-print(out2,pars = c("gamma","tau","tau_s","phi","theta"))
+print(out,pars = c("gamma","sigma","tau","phi","power"))
+print(out2,pars = c("gamma","sigma","tau","phi","power"))
 
 out110$summary(NULL,"mean")
 post <- out$draws(c("max_lambda","max_eta")) %>% posterior::as_draws_df()
 post <- out$draws(c("y_rep","mu")) %>% posterior::as_draws_df()
-post <- extract(out110i,c("max_lambda","max_eta"))
+post <- extract(out,c("max_lambda","max_eta"))
 quantile(post$max_lambda,
          c(0, .5, .9, .95, .99, .999, 1))
 
@@ -239,69 +239,69 @@ quantile(
   probs = c(0.5, 0.9, 0.99, 0.999, 1)
 )
 
-real <- c(do.call(rbind,gamma),tau_T,tau_S,phi,power)
-means1 <-rstan::get_posterior_mean(out, c("gamma","tau","tau_s","phi","theta"))[,5]
-means2 <-rstan::get_posterior_mean(out2, c("gamma","tau","tau_s","phi","theta"))[,5]
+real <- c(do.call(rbind,gamma),sigma,tau,phi,power)
+means1 <-rstan::get_posterior_mean(out, c("gamma","sigma","tau","phi","power"))[,5]
+means2 <-rstan::get_posterior_mean(out2, c("gamma","sigma","tau","phi","power"))[,5]
 
 rbind(means1,means2,real)
 rbind(means1,real)
 
-real <- c(do.call(rbind,gamma),tau_T,tau_S,phi,power)
-means30 <-rstan::get_posterior_mean(out30, c("gamma","tau","tau_s","phi","theta"))[,5]
-means40 <-rstan::get_posterior_mean(out40, c("gamma","tau","tau_s","phi","theta"))[,5]
-means50 <-rstan::get_posterior_mean(out50, c("gamma","tau","tau_s","phi","theta"))[,5]
-means60 <-rstan::get_posterior_mean(out60, c("gamma","tau","tau_s","phi","theta"))[,5]
-means80 <-rstan::get_posterior_mean(out80, c("gamma","tau","tau_s","phi","theta"))[,5]
-means110 <-rstan::get_posterior_mean(out110i, c("gamma","tau","tau_s","phi","theta"))[,5]
-means130 <-rstan::get_posterior_mean(out130, c("gamma","tau","tau_s","phi","theta"))[,5]
+real <- c(do.call(rbind,gamma),sigma,tau,phi,power)
+means30 <-rstan::get_posterior_mean(out30, c("gamma","sigma","tau","phi","power"))[,5]
+means40 <-rstan::get_posterior_mean(out40, c("gamma","sigma","tau","phi","power"))[,5]
+means50 <-rstan::get_posterior_mean(out50, c("gamma","sigma","tau","phi","power"))[,5]
+means60 <-rstan::get_posterior_mean(out60, c("gamma","sigma","tau","phi","power"))[,5]
+means80 <-rstan::get_posterior_mean(out80, c("gamma","sigma","tau","phi","power"))[,5]
+means110 <-rstan::get_posterior_mean(out110i, c("gamma","sigma","tau","phi","power"))[,5]
+means130 <-rstan::get_posterior_mean(out130, c("gamma","sigma","tau","phi","power"))[,5]
 rbind(means30,means40,means50,means60,means80,means110,means130,real)
 rbind(means110,real)
 
-a <- out$summary(c("gamma","tau","tau_s","phi","theta"),"mean")
+a <- out$summary(c("gamma","sigma","tau","phi","power"),"mean")
 b <- a$mean
 names(b) <- a$variable
 
 rbind(b,real)
 
-# simple model  ----------------------------------------------------------------
-
-# Simulation inputs
-n <- 2500
-n <- 1000
-power <- 1.3
-phi <- 1
-beta <- c(3,0,.2,-.1)
-
-
-# number of predictors
-n_beta <- length(beta)
-
-# Simulate random predictor data
-X <- cbind(1,replicate(n_beta-1, rnorm(n)))
-
-# Simulate response data
-mu <- exp(X%*%beta) 
-Y <- rtweedie(n,mu=mu,power = power,phi=phi)
-
-# Prepare data
-stan_data <- list(
-  M = 30,
-  N = nrow(Y),
-  K = ncol(X),
-  X = X,
-  Y= Y
-)
-
-out <- stan(
-  file = file.path(stan_dir,"first_level_tweedie.stan"),
-  data = stan_data,
-  iter = 3000,
-  warmup = 1000,
-  chains =4,
-  # control = list(adapt_delta = .97),  
-  cores = 4
-)
-
-print(out,pars = c("theta","phi","beta"))
-
-
+# # simple model  ----------------------------------------------------------------
+# 
+# # Simulation inputs
+# n <- 2500
+# n <- 1000
+# power <- 1.3
+# phi <- 1
+# beta <- c(3,0,.2,-.1)
+# 
+# 
+# # number of predictors
+# n_beta <- length(beta)
+# 
+# # Simulate random predictor data
+# X <- cbind(1,replicate(n_beta-1, rnorm(n)))
+# 
+# # Simulate response data
+# mu <- exp(X%*%beta) 
+# Y <- rtweedie(n,mu=mu,power = power,phi=phi)
+# 
+# # Prepare data
+# stan_data <- list(
+#   M = 30,
+#   N = nrow(Y),
+#   K = ncol(X),
+#   X = X,
+#   Y= Y
+# )
+# 
+# out <- stan(
+#   file = file.path(stan_dir,"first_level_tweedie.stan"),
+#   data = stan_data,
+#   iter = 3000,
+#   warmup = 1000,
+#   chains =4,
+#   # control = list(adapt_delta = .97),  
+#   cores = 4
+# )
+# 
+# print(out,pars = c("theta","phi","beta"))
+# 
+# 

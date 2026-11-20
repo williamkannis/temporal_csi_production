@@ -17,31 +17,31 @@ data {
 
 parameters {
   matrix[L,K] gamma;                  // year-level effect coefficents
-  array[R] matrix[K,T] beta_raw;      // standardized year-level deviations
+  array[R] matrix[K,T] theta_raw;      // standardized year-level deviations
   vector[S] st_raw;                   // standardized site effect deviations
   cholesky_factor_corr[K] L_omega;    // Cholesky transformed correlation matrix
-  vector<lower=0>[K] tau;             // year-level effect coefficents error
-  real<lower=0> tau_s;                // site random effect error
-  // vector<lower=0>[R] tau_s;           // site random effect error
+  vector<lower=0>[K] sigma;             // year-level effect coefficents error
+  real<lower=0> tau;                // site random effect error
+  // vector<lower=0>[R] tau;           // site random effect error
   real<lower=0> phi;
-  real<lower=1, upper=2> theta;
-  // real<lower=1.01, upper=1.99> theta;
+  real<lower=1, upper=2> power;
+  // real<lower=1.01, upper=1.99> power;
 }
 
 transformed parameters {
-  array[R] matrix[K,T] beta;          // year_region-level effect coefficents
+  array[R] matrix[K,T] theta;          // year_region-level effect coefficents
   vector[S] st_eff;                   // site random effect
 
   // year-level MVN random effects - noncentered parametrization
   for (r in 1:R){
-    matrix[K,T] beta_error;
-    beta_error = diag_pre_multiply(tau,L_omega)*beta_raw[r];
-    beta[r] = (z[r] * gamma)' + beta_error;
+    matrix[K,T] theta_error;
+    theta_error = diag_pre_multiply(sigma,L_omega)*theta_raw[r];
+    theta[r] = (z[r] * gamma)' + theta_error;
   }
   
   // site-level MVN random effects - noncentered parametrization
-  st_eff = tau_s * st_raw;
-  // st_eff = tau_s[rg] .* st_raw;
+  st_eff = tau * st_raw;
+  // st_eff = tau[rg] .* st_raw;
   
 // Mu vector
     vector[N] eta;    
@@ -51,7 +51,7 @@ transformed parameters {
       int t = yr[n];
       int s = st[n];
       int r = rg[s];
-      eta[n] = x[n] * beta[r][,t] + st_eff[s];
+      eta[n] = x[n] * theta[r][,t] + st_eff[s];
     }
     mu = exp(eta);
     
@@ -61,17 +61,17 @@ transformed parameters {
   real alpha;
   vector[M] log_m_factorial;
 
-  alpha = (2 - theta) / (theta - 1);
+  alpha = (2 - power) / (power - 1);
 
   lambda =
-      exp((2 - theta) * eta)
+      exp((2 - power) * eta)
       / phi
-      / (2 - theta);
+      / (2 - power);
 
   beta_gamma =
-      exp((1 - theta) * eta)
+      exp((1 - power) * eta)
       / phi
-      / (theta - 1);
+      / (power - 1);
       
   for (m in 1:M)
     log_m_factorial[m] = lgamma(m + 1);
@@ -85,14 +85,14 @@ model {
   to_vector(gamma) ~ normal(0, 1);
 
   for (r in 1:R)
-    to_vector(beta_raw[r]) ~ std_normal();
+    to_vector(theta_raw[r]) ~ std_normal();
 
   st_raw ~ std_normal();
 
   L_omega ~ lkj_corr_cholesky(2);
 
+  sigma ~ normal(0, 1);
   tau ~ normal(0, 1);
-  tau_s ~ normal(0, 1);
 
   // Tweedie dispersion
   // phi ~ cauchy(0, 5);
@@ -182,7 +182,7 @@ generated quantities {
 
     // residuals
     raw_residuals[n] = y[n]-mu[n];
-    pearson_residual[n] = raw_residuals[n] / sqrt(phi * pow(mu[n], theta));
+    pearson_residual[n] = raw_residuals[n] / sqrt(phi * pow(mu[n], power));
 
     // probability of zero
     p_zero[n] = exp(-lambda[n]);
