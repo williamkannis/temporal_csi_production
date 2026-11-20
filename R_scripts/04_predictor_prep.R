@@ -12,13 +12,12 @@
 
 
 # House keeping  ---------------------------------------------------------------
-rm(list = ls())
+rm(list = ls())  
 
 # Packages
 library(dplyr)
-devtools::load_all("~/Documents/work/R packages/secProd")
 
-# directores
+# Directories
 data_dir <- paste0(
   "~/Documents/Work/Everglades post-doc/",
   "Data analysis/Data cleaning/cleaned_data"
@@ -26,11 +25,11 @@ data_dir <- paste0(
 input_dir <- "input_data"
 export_dir <- "prod_data"
 
-# data
-len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-07-09.rds"))
-pisc_df <- readRDS(file.path(data_dir,"pisc_cleaned_2026-07-13.rds"))
-samp_df <- readRDS(file.path(export_dir,"fs_sample_info_2026-08-12.rds"))
-phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-07-09.rds"))
+# Data
+len_df <- readRDS(file.path(input_dir,"fslen_imputed_2026-11-16.rds"))
+pisc_df <- readRDS(file.path(data_dir,"pisc_cleaned_2026-11-03.rds"))
+samp_df <- readRDS(file.path(export_dir,"fs_sample_info_2026-11-18.rds"))
+phy_df <- readRDS(file.path(data_dir,"phys_cleaned_2026-11-03.rds"))
 
 
 # Sampling interval  -----------------------------------------------------------
@@ -125,174 +124,85 @@ phy_site_final <- phy_site %>%
   )
 summary(phy_site_final)
 
-# TEMPORARY IMPUTE - MAYBE CHANGE TO MEAN VALUE
-set.seed(999)
-phy_site_final <- group_impute(
-  phy_site_final,
-  plt_cov_int,
-  by = c(region,site,wateryear)
+# Impute using median values for site and year
+miss_meds <- phy_site_final %>% 
+  group_by(region,site,wateryear) %>% 
+  summarise(
+    across(
+      .cols = c(plt_cov_int,peri_vol_int),
+      .fns = \(x) mean(x, na.rm = T),
+      .names = "{.col}_median"
+    )
   )
-phy_site_final <- group_impute(
-  phy_site_final,
-  peri_vol_int,
-  by = c(region,site,wateryear)
-  )
-phy_site_final <- phy_site_final %>% select(-impute)
+
+phy_site_impute <- phy_site_final %>% 
+  left_join(miss_meds) %>% 
+  mutate(
+    across(
+      .cols = c(plt_cov_int,peri_vol_int),
+      .fns = \(x) case_when(
+        is.na(x) ~ get(paste0(cur_column(), "_median")),
+        T ~ x
+      )
+    )
+  ) %>% 
+  select(-contains("_median"))
+
+summary(phy_site_impute)
+
+# Check for correlation
+phy_site_impute %>% 
+  select(-wateryear, -region, -site) %>% 
+  cor(use = "complete.obs")
 
 
 # Site/Year-level predictors ---------------------------------------------------
 
-# phy_site_year <- phy_df %>% 
-#   select(
-#     region,
-#     site,
-#     wateryear,
-#     waterperiod,
-#     wet_sum_365day,
-#     # depth_ave_365day,
-#     # dsldd,
-#     # lastdaydry
-#   ) %>% 
-#   filter(waterperiod == 5) %>% 
-#   group_by(wateryear,region,site) %>% 
-#   summarize(
-#     across(everything(),~mean(.x,na.rm=T)),
-#     .groups = "drop"
-#   ) %>% 
-#   left_join(pisc_df) # %>%
-# # inner_join(samp_for %>% distinct(region,site,wateryear)) 
+# Filter annual predation data to only include analysis regions
+pred_year <- pisc_df %>% 
+  filter(region != "PHD")
 
-# Annual hyroperiod
-phy_site_year <- phy_df %>% 
-  filter(waterperiod == 5) %>% 
+
+# Summarize annual hydroperiod at site wateryear
+hydr_year <- phy_df %>% 
+  filter(
+    waterperiod == 5,
+    wateryear > 1996
+    ) %>% 
   group_by(wateryear,region,site) %>% 
   summarize(
     across(wet_sum_365day,~mean(.x,na.rm=T)),
     .groups = "drop"
-  ) %>% 
+  )
   
-  # Annual predator abundance
-  left_join(pisc_df) # %>%
- 
-summary(phy_site_year)
-
-# Check for correlation
-phy_site_year %>% 
-  select(-wateryear, -region, -site,  -waterperiod) %>% 
-  cor(use = "complete.obs")
-
-
-# # TEMPORARY IMPUTE
-# set.seed(999)
-# phy_site_year_impute <- group_impute(
-#   phy_site_year,
-#   pisc_index,
-#   by = c(region)
-# ) %>% 
-#   select(-impute)
-# 
-# # Create lag effects
-# phy_site_year_lag <- phy_site_year_impute %>% 
-#   group_by(region,site) %>% 
-#   mutate(
-#     across(
-#       .cols = c(wet_sum_365day,depth_ave_365day,lastdaydry,pisc_index),
-#       .fns = ~lag(.x,order_by = wateryear),
-#       .names = "{.col}_lag"
-#     ),
-#   ) %>% 
-#   ungroup() %>% 
-#   inner_join(samp_for %>% distinct(region,site,wateryear)) 
-# 
-# # Check for correlation
-# phy_site_year_lag %>% 
-#   select(-wateryear, -region, -site,  -waterperiod) %>% 
-#   cor(use = "complete.obs")
-
-
-# Site-year PCA  ---------------------------------------------------------------
-# 
-# # Use full pisc and hydrology data sets to conduct PCA on biological and
-# # hydrology variables
-# # Prepare data input
-# pca_input <-phy_site_year_lag %>% 
-#   select(-wateryear, -region, -site,  -waterperiod) %>% 
-#   select(!contains("lag"))
-# 
-# 
-# # Run pca
-# pca_out <- vegan::rda(pca_input,scale = T)
-# 
-# # Examine results
-# summary(pca_out)
-# pca_out$CA$v
-# plot(pca_out, type = "n") 
-# points(pca_out, pch=19, display = "sites") 
-# text(pca_out, display = "species", col="blue") 
-# 
-# # Extract pcs that explain atleast 75% of variation and create data.frame
-# pca_result <-vegan::scores(pca_out,choices = c(1,2),display = "sites")
-# phy_site_year_pca <- cbind(phy_site_year_lag,pca_result)
-
-
-# Region-year level predictors  ------------------------------------------------
-phy_reg_year <- phy_site_year %>% 
-# phy_reg_year <- phy_site_year_pca %>% 
+# Combine and summarize at Region/wateryear
+phy_reg_year <- hydr_year %>% 
+  left_join(pred_year) %>%
   group_by(region,wateryear) %>% 
   summarise(across(
-    c(-site,-waterperiod),
+    -site,
     ~mean(.x,na.rm=T)
     ),
     .groups = "drop"
   )
 
-## IMPUTE 95-96 PISC INDEX ##
-# TEMPORARY IMPUTE - MAYBE CHANGE TO MEAN VALUE
-# set.seed(999)
-phy_reg_year_impute <- group_impute(
-  phy_reg_year,
-  pisc_index,
-  by = c(region)
-) %>%
-  select(-impute)
+summary(phy_reg_year)
 
 # Check for correlation
-phy_reg_year_impute %>% 
+phy_reg_year %>% 
   select(-wateryear, -region) %>% 
   cor(use = "complete.obs")
 
 
-# Year-level predictors  -------------------------------------------------------
-# phy_year <- phy_site_year_pca %>% 
-#   group_by(wateryear) %>% 
-#   summarise(across(
-#     c(-site,-region,-waterperiod),
-#     ~mean(.x,na.rm=T)
-#     ),
-#     .groups = "drop"
-#     )
-# 
-# # Check for correlation
-# phy_year %>% 
-#   select(-wateryear) %>% 
-#   cor(use = "complete.obs")
-
-
 # Export  ----------------------------------------------------------------------
 saveRDS(
-  phy_site_final,
+  phy_site_impute,
   file.path(export_dir,paste0("phys_site_predictors_",Sys.Date(),".rds"))
   )
-# saveRDS(
-#   phy_site_year_pca, 
-#   file.path(export_dir,paste0("phys_siteyear_predictors_",Sys.Date(),".rds"))
-#   )
+
 saveRDS(
-  phy_reg_year_impute,
+  phy_reg_year,
   file.path(export_dir,paste0("phys_regionyear_predictors_",Sys.Date(),".rds"))
 )
-# saveRDS(
-#   phy_year,
-#   file.path(export_dir,paste0("phys_year_predictors_",Sys.Date(),".rds"))
-# )
+
 
