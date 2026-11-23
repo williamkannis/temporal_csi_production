@@ -173,15 +173,15 @@ message("============================================================")
 
 # Gamma coefficient summary  ---------------------------------------------------
 
-# Mean and 95% credible intervals for global first level effects, and cross-
+# median and 95% credible intervals for global first level effects, and cross-
 # scale interaction coefficients.
 
-### Extract mean and 95% CIs  ###
+### Extract median and 95% CIs  ###
 message("[", Sys.time(), "] Summarizing gamma coefficients...")
 
 gamma_coef <- out$summary(
   "gamma",
-  mean,
+  median,
   quantile, 
   .args = list(probs = c(0.025, 0.975))
 ) %>% 
@@ -251,12 +251,12 @@ message("[", Sys.time(), "] Gamma-varaible name bridge created")
   
 # Region/year specific first level effect coefficients
 
-### Extract mean and 95% CIs  ###
+### Extract median and 95% CIs  ###
 message("[", Sys.time(), "] Summarizing Theta coefficients...")
 
 theta_coef <- out$summary(
   "theta",
-  mean,
+  median,
   quantile, 
   .args = list(probs = c(0.025, 0.975))
 ) %>% 
@@ -463,14 +463,14 @@ message(
 
 # Predicted thetas (summarized)  -----------------------------------------------
 
-# Estimate mean and 95% Credible intervals for each theta prediction
+# Estimate median and 95% Credible intervals for each theta prediction
 message("[", Sys.time(), "] Summarizing theta predictions...")
 
 theta_pred <- theta_pred_raw %>% 
   bind_rows() %>% 
   select(-iter) %>% 
   group_by(across(-pred)) %>% 
-  filter(is.na(z_cat) | z_cat != "mean") %>%   # remove the global effect
+  filter(is.na(z_cat) | z_cat != "median") %>%   # remove the global effect
   summarize(
     pred_md = quantile(pred, probs = 0.5, na.rm = TRUE),
     pred_lo = quantile(pred, probs = 0.025, na.rm = TRUE),
@@ -483,7 +483,7 @@ message("[", Sys.time(), "] Theta predictions summarized")
 # Predicted responses (raw; min,med,max CSI)  ----------------------------------
 
 # Use predicted thetas to predict responses across 1st level predictors. 
-# Predictions are summarized with mean and 95% credible intervals
+# Predictions are summarized with median and 95% credible intervals
 
 # X and Z combos used for response predictions
 message(
@@ -581,7 +581,7 @@ message(
 
 # Predicted responses (summary; min,med,max CSI)  ------------------------------
 
-# Estimate mean and 95% Credible intervals for each response prediction
+# Estimate median and 95% Credible intervals for each response prediction
 message("[", Sys.time(), "] Summarizing response predictions...")
 
 response_pred <- response_pred_raw %>% 
