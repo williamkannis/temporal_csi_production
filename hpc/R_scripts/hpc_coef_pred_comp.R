@@ -45,7 +45,7 @@ names(file_list) <- name_prefix
 
 
 ### Check that all file types have the same number of files  ###
-if(length(unique(lengths(a))) !=1) {
+if(length(unique(lengths(file_list))) !=1) {
   warning("Some file types have unequal number of species/response files")
 }
 
@@ -68,21 +68,28 @@ data_list <- lapply(file_list, function(x) {
 })
 
 
-
 # Exporting  ===================================================================
 
-### Export each file type  ###
+# ### Export each file type  ###
+# message("[", Sys.time(), "] Starting exporting...")
+# 
+# lapply(name_prefix, function(x){
+#   
+#   df <- data_list[[x]]
+#   file_name <- file.path(export_dir,(paste0(x,".rds")))
+#   saveRDS(df,file_name)
+#   
+#   message("[", Sys.time(), "] ", x, " exported")
+#   
+# })
+# 
+# message("[", Sys.time(), "] Exports finished")
+
+### Export into one file  ###
 message("[", Sys.time(), "] Starting exporting...")
 
-lapply(name_prefix, function(x){
-  
-  df <- data_list[[x]]
-  file_name <- file.path(export_dir,(paste0(x,".rds")))
-  saveRDS(df,file_name)
-  
-  message("[", Sys.time(), "] ", x, " exported")
-  
-})
+file_name <- file.path(export_dir,"model_output_summaries.rds")
+saveRDS(data_list, )
 
 message("[", Sys.time(), "] Exports finished")
 
