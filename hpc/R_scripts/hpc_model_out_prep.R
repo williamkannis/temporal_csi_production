@@ -10,6 +10,7 @@ message("============================================================")
 # DO NO RUN OUTSIDE OF SLURM.
 
 # House keeping  ===============================================================
+rm(list = ls())
 
 # Packages
 message("[", Sys.time(), "] Loading packages...")
@@ -23,7 +24,7 @@ message("[", Sys.time(), "] Packages loaded")
 
 
 # Directories
-out_dir <- "stan_outputs"
+out_dir <- "hpc/stan_outputs"
 data_dir <- "hpc/data"
 export_dir <- "hpc/intermediate"
 
@@ -106,6 +107,8 @@ message("[", Sys.time(), "] Setting model prediction settings...")
 
 pred_len <- 100
 n_iter <- 1000
+ci_min <- 0.025
+ci_max <- 0.975
 
 message(
   "[", Sys.time(),
@@ -113,8 +116,11 @@ message(
   pred_len,
   " predictor values using ",
   n_iter,
-  " posterior draws"
-  )
+  " posterior draws. Estiamting credible intervals at ",
+  ci_min,
+  " and ",
+  ci_max
+)
 
 
 
@@ -183,7 +189,7 @@ gamma_coef <- out$summary(
   "gamma",
   median,
   quantile, 
-  .args = list(probs = c(0.025, 0.975))
+  .args = list(probs = c(ci_min, ci_max))
 ) %>% 
   rename(
     lwr = `2.5%`,
@@ -258,7 +264,7 @@ theta_coef <- out$summary(
   "theta",
   median,
   quantile, 
-  .args = list(probs = c(0.025, 0.975))
+  .args = list(probs = c(ci_min, ci_max))
 ) %>% 
   rename(
     upr = `97.5%`,
@@ -470,11 +476,11 @@ theta_pred <- theta_pred_raw %>%
   bind_rows() %>% 
   select(-iter) %>% 
   group_by(across(-pred)) %>% 
-  filter(is.na(z_cat) | z_cat != "median") %>%   # remove the global effect
+  filter(is.na(z_cat) | z_cat != "mean") %>%   # remove the global effect
   summarize(
     pred_md = quantile(pred, probs = 0.5, na.rm = TRUE),
-    pred_lo = quantile(pred, probs = 0.025, na.rm = TRUE),
-    pred_up = quantile(pred, probs = 0.975, na.rm = TRUE),
+    pred_lo = quantile(pred, probs = ci_min, na.rm = TRUE),
+    pred_up = quantile(pred, probs = ci_max, na.rm = TRUE),
     .groups = "drop"
     )
 
@@ -589,8 +595,8 @@ response_pred <- response_pred_raw %>%
   group_by(across(-pred)) %>% 
   summarize(
     pred_md = quantile(pred, probs = 0.5, na.rm = TRUE),
-    pred_lo = quantile(pred, probs = 0.025, na.rm = TRUE),
-    pred_up = quantile(pred, probs = 0.975, na.rm = TRUE),
+    pred_lo = quantile(pred, probs = ci_min, na.rm = TRUE),
+    pred_up = quantile(pred, probs = ci_max, na.rm = TRUE),
     .groups = "drop"
   )
  
@@ -646,8 +652,8 @@ prop_change <- response_pred_raw %>%
       .cols = c(prop_change, diff),
       .fns = list(
         md = ~ quantile(.x, probs = 0.500, na.rm = TRUE),
-        lo = ~ quantile(.x, probs = 0.025, na.rm = TRUE),
-        up = ~ quantile(.x, probs = 0.975, na.rm = TRUE)
+        lo = ~ quantile(.x, probs = ci_min, na.rm = TRUE),
+        up = ~ quantile(.x, probs = ci_max, na.rm = TRUE)
       ),
       .names = "{.col}_{.fn}"
     ),
